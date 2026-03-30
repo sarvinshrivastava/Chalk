@@ -1,0 +1,47 @@
+.settle-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settle-page h2 {
+  font-weight: 700;
+  font-size: 1.3rem;
+}
+
+.settle-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settle-section h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.settle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settle-card-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.settle-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.no-upi {
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  font-style: italic;
+}

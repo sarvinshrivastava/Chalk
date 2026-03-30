@@ -1,0 +1,70 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap");
+
+:root {
+  /* Chalk Design Tokens — Section 14.2 */
+  --primary: #0A6E5A;
+  --primary-light: #0A6E5A1A;
+  --surface: #FAF8F3;
+  --ink: #252018;
+  --ink-muted: #25201880;
+  --accent: #B87514;
+  --danger: #C0392B;
+  --danger-light: #C0392B1A;
+  --warning: #E8993C;
+  --warning-light: #E8993C1A;
+  --info: #1A5FA5;
+  --white: #FFFFFF;
+  --border: #E5E2DB;
+
+  /* Typography — Section 14.3 */
+  --font: "DM Sans", system-ui, -apple-system, sans-serif;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 15px;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--surface);
+  color: var(--ink);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+input,
+button,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+/* Utility: amounts always tabular */
+.amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.amount--positive {
+  color: var(--primary);
+}
+
+.amount--negative {
+  color: var(--danger);
+}
