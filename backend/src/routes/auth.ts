@@ -1,181 +1,90 @@
-import { Router, type Request, type Response } from "express";
-import { adminClient } from "../lib/supabase.js";
-import { createUserClient } from "../lib/supabase.js";
+import { Router } from "express";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
+import { validate } from "../lib/validate.js";
+import { asyncHandler } from "../lib/errors.js";
+import {
+  emailSignupSchema,
+  emailSigninSchema,
+  oauthSigninSchema,
+  refreshSchema,
+  updateProfileSchema,
+} from "../schemas/auth.js";
+import * as authService from "../services/auth.js";
 
 const router = Router();
 
-// ─── Email signup ───────────────────────────────────────────
-router.post("/signup/email", async (req: Request, res: Response) => {
-  const { email, password, name } = req.body;
+router.post(
+  "/signup/email",
+  validate(emailSignupSchema),
+  asyncHandler(async (req, res) => {
+    const { email, password, name } = req.body;
+    const result = await authService.signUpWithEmail(email, password, name);
+    res.status(201).json(result);
+  }),
+);
 
-  if (!email || !password || !name) {
-    res.status(400).json({ error: "email, password, and name are required" });
-    return;
-  }
+router.post(
+  "/signin/email",
+  validate(emailSigninSchema),
+  asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    const result = await authService.signInWithEmail(email, password);
+    res.json(result);
+  }),
+);
 
-  const { data, error } = await adminClient.auth.signUp({
-    email,
-    password,
-    options: { data: { name } },
-  });
-
-  if (error) {
-    res.status(400).json({ error: error.message });
-    return;
-  }
-
-  // Create user row in public.users table
-  if (data.user) {
-    await adminClient.from("users").insert({
-      id: data.user.id,
+router.post(
+  "/signin/oauth",
+  validate(oauthSigninSchema),
+  asyncHandler(async (req, res) => {
+    const { access_token, provider, name } = req.body;
+    const result = await authService.signInWithOAuth(
+      access_token,
+      provider,
       name,
-      auth_provider: "email",
-    });
-  }
+    );
+    res.json(result);
+  }),
+);
 
-  res.json({ user: data.user, session: data.session });
-});
+router.post(
+  "/refresh",
+  validate(refreshSchema),
+  asyncHandler(async (req, res) => {
+    const result = await authService.refreshSession(req.body.refresh_token);
+    res.json(result);
+  }),
+);
 
-// ─── Email signin ───────────────────────────────────────────
-router.post("/signin/email", async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+router.post(
+  "/signout",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { accessToken } = req as AuthRequest;
+    await authService.signOut(accessToken);
+    res.json({ ok: true });
+  }),
+);
 
-  if (!email || !password) {
-    res.status(400).json({ error: "email and password are required" });
-    return;
-  }
+router.get(
+  "/me",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { userId, accessToken } = req as AuthRequest;
+    const user = await authService.getProfile(userId, accessToken);
+    res.json({ user });
+  }),
+);
 
-  const { data, error } = await adminClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) {
-    res.status(401).json({ error: error.message });
-    return;
-  }
-
-  res.json({ user: data.user, session: data.session });
-});
-
-// ─── OAuth (Google / Apple) ─────────────────────────────────
-// The actual OAuth flow happens client-side via Supabase SDK.
-// This endpoint exchanges the OAuth access token for a user record
-// and ensures the public.users row exists.
-router.post("/signin/oauth", async (req: Request, res: Response) => {
-  const { access_token, provider, name } = req.body;
-
-  if (!access_token || !provider) {
-    res.status(400).json({ error: "access_token and provider are required" });
-    return;
-  }
-
-  if (!["google", "apple"].includes(provider)) {
-    res.status(400).json({ error: "provider must be google or apple" });
-    return;
-  }
-
-  // Verify the token by fetching the user
-  const supabase = createUserClient(access_token);
-  const { data, error } = await supabase.auth.getUser(access_token);
-
-  if (error || !data.user) {
-    res.status(401).json({ error: "Invalid OAuth token" });
-    return;
-  }
-
-  // Upsert public.users row (idempotent for repeat logins)
-  const displayName = name || data.user.user_metadata?.full_name || "User";
-  await adminClient.from("users").upsert(
-    {
-      id: data.user.id,
-      name: displayName,
-      auth_provider: provider,
-    },
-    { onConflict: "id" }
-  );
-
-  res.json({ user: data.user });
-});
-
-// ─── Refresh session ────────────────────────────────────────
-router.post("/refresh", async (req: Request, res: Response) => {
-  const { refresh_token } = req.body;
-
-  if (!refresh_token) {
-    res.status(400).json({ error: "refresh_token is required" });
-    return;
-  }
-
-  const { data, error } = await adminClient.auth.refreshSession({
-    refresh_token,
-  });
-
-  if (error) {
-    res.status(401).json({ error: error.message });
-    return;
-  }
-
-  res.json({ session: data.session });
-});
-
-// ─── Sign out ───────────────────────────────────────────────
-router.post("/signout", requireAuth, async (req: Request, res: Response) => {
-  const { accessToken } = req as AuthRequest;
-  const supabase = createUserClient(accessToken);
-  await supabase.auth.signOut();
-  res.json({ ok: true });
-});
-
-// ─── Get current user profile ───────────────────────────────
-router.get("/me", requireAuth, async (req: Request, res: Response) => {
-  const { userId, accessToken } = req as AuthRequest;
-  const supabase = createUserClient(accessToken);
-
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", userId)
-    .single();
-
-  if (error) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
-
-  res.json({ user: data });
-});
-
-// ─── Update profile (name, upi_id, phone) ──────────────────
-router.patch("/me", requireAuth, async (req: Request, res: Response) => {
-  const { userId, accessToken } = req as AuthRequest;
-  const { name, upi_id, phone } = req.body;
-  const supabase = createUserClient(accessToken);
-
-  const updates: Record<string, unknown> = {};
-  if (name !== undefined) updates.name = name;
-  if (upi_id !== undefined) updates.upi_id = upi_id;
-  if (phone !== undefined) updates.phone = phone;
-
-  if (Object.keys(updates).length === 0) {
-    res.status(400).json({ error: "No fields to update" });
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from("users")
-    .update(updates)
-    .eq("id", userId)
-    .select()
-    .single();
-
-  if (error) {
-    res.status(400).json({ error: error.message });
-    return;
-  }
-
-  res.json({ user: data });
-});
+router.patch(
+  "/me",
+  requireAuth,
+  validate(updateProfileSchema),
+  asyncHandler(async (req, res) => {
+    const { userId, accessToken } = req as AuthRequest;
+    const user = await authService.updateProfile(userId, accessToken, req.body);
+    res.json({ user });
+  }),
+);
 
 export default router;
