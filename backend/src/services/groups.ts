@@ -1,9 +1,10 @@
 import { createUserClient, adminClient } from "../lib/supabase.js";
 import { AppError } from "../lib/errors.js";
 import { GROUP_MAX_MEMBERS } from "@chalk/shared";
+import { requireGroupMembership } from "./helpers.js";
 
 export async function createGroup(
-  userId: string,
+  _userId: string,
   accessToken: string,
   name: string,
 ) {
@@ -86,22 +87,22 @@ export async function inviteMember(
     );
 
   const supabase = createUserClient(accessToken);
-  const { data: membership } = await supabase
-    .from("group_members")
-    .select("user_id")
-    .eq("group_id", groupId)
-    .limit(1)
-    .maybeSingle();
 
-  if (!membership)
-    throw new AppError(403, "You are not a member of this group", "NOT_MEMBER");
+  const [, countResult, existingResult] = await Promise.all([
+    requireGroupMembership(supabase, groupId),
+    adminClient
+      .from("group_members")
+      .select("*", { count: "exact", head: true })
+      .eq("group_id", groupId),
+    adminClient
+      .from("group_members")
+      .select("user_id")
+      .eq("group_id", groupId)
+      .eq("user_id", targetUser.id)
+      .maybeSingle(),
+  ]);
 
-  const { count } = await adminClient
-    .from("group_members")
-    .select("*", { count: "exact", head: true })
-    .eq("group_id", groupId);
-
-  if (count !== null && count >= GROUP_MAX_MEMBERS) {
+  if (countResult.count !== null && countResult.count >= GROUP_MAX_MEMBERS) {
     throw new AppError(
       400,
       `Group cannot exceed ${GROUP_MAX_MEMBERS} members`,
@@ -109,14 +110,7 @@ export async function inviteMember(
     );
   }
 
-  const { data: existing } = await adminClient
-    .from("group_members")
-    .select("user_id")
-    .eq("group_id", groupId)
-    .eq("user_id", targetUser.id)
-    .maybeSingle();
-
-  if (existing)
+  if (existingResult.data)
     throw new AppError(409, "User is already a member", "ALREADY_MEMBER");
 
   const { error } = await adminClient

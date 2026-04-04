@@ -27,3 +27,8 @@ export function validateParams(schema: ZodSchema) {
     next();
   };
 }
+
+/** Extract a validated route param as a string. Safe after validateParams. */
+export function param(req: Request, name: string): string {
+  return req.params[name] as string;
+}

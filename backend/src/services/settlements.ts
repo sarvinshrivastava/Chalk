@@ -1,6 +1,7 @@
 import { createUserClient, adminClient } from "../lib/supabase.js";
 import { AppError } from "../lib/errors.js";
 import { buildAppSpecificUpiLinks } from "@chalk/shared";
+import { fetchPendingSettlement } from "./helpers.js";
 
 export async function createSettlement(
   userId: string,
@@ -49,22 +50,7 @@ export async function createSettlement(
 }
 
 export async function confirmSettlement(settlementId: string, userId: string) {
-  const { data: settlement } = await adminClient
-    .from("settlements")
-    .select("*")
-    .eq("id", settlementId)
-    .single();
-
-  if (!settlement)
-    throw new AppError(404, "Settlement not found", "SETTLEMENT_NOT_FOUND");
-  if (settlement.to_user !== userId)
-    throw new AppError(403, "Only the payee can confirm", "NOT_PAYEE");
-  if (settlement.status !== "pending")
-    throw new AppError(
-      409,
-      `Settlement is already ${settlement.status}`,
-      "INVALID_STATUS",
-    );
+  await fetchPendingSettlement(settlementId, userId, "payee");
 
   const { data, error } = await adminClient
     .from("settlements")
@@ -78,22 +64,7 @@ export async function confirmSettlement(settlementId: string, userId: string) {
 }
 
 export async function rejectSettlement(settlementId: string, userId: string) {
-  const { data: settlement } = await adminClient
-    .from("settlements")
-    .select("*")
-    .eq("id", settlementId)
-    .single();
-
-  if (!settlement)
-    throw new AppError(404, "Settlement not found", "SETTLEMENT_NOT_FOUND");
-  if (settlement.to_user !== userId)
-    throw new AppError(403, "Only the payee can reject", "NOT_PAYEE");
-  if (settlement.status !== "pending")
-    throw new AppError(
-      409,
-      `Settlement is already ${settlement.status}`,
-      "INVALID_STATUS",
-    );
+  await fetchPendingSettlement(settlementId, userId, "payee");
 
   const { data, error } = await adminClient
     .from("settlements")
@@ -111,20 +82,7 @@ export async function addTxnRef(
   userId: string,
   upiTxnId: string,
 ) {
-  const { data: settlement } = await adminClient
-    .from("settlements")
-    .select("from_user")
-    .eq("id", settlementId)
-    .single();
-
-  if (!settlement)
-    throw new AppError(404, "Settlement not found", "SETTLEMENT_NOT_FOUND");
-  if (settlement.from_user !== userId)
-    throw new AppError(
-      403,
-      "Only the payer can add a transaction reference",
-      "NOT_PAYER",
-    );
+  await fetchPendingSettlement(settlementId, userId, "payer");
 
   const { data, error } = await adminClient
     .from("settlements")

@@ -53,9 +53,9 @@ export async function getGroupBalances(groupId: string, accessToken: string) {
     amount_owed: s.amount_owed,
   }));
   const settlements = (settlementsRes.data ?? []).map((s) => ({
-    from_user: s.from_user,
-    to_user: s.to_user,
-    amount: s.amount,
+    from_user: s.from_user as string,
+    to_user: s.to_user as string,
+    amount: s.amount as number,
     status: s.status as string,
   }));
 

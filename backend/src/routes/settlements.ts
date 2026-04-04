@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
-import { validate, validateParams } from "../lib/validate.js";
+import { validate, validateParams, param } from "../lib/validate.js";
 import { asyncHandler } from "../lib/errors.js";
 import {
   createSettlementSchema,
@@ -42,7 +42,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthRequest;
     const settlement = await settlementsService.confirmSettlement(
-      req.params.settlementId as string,
+      param(req, "settlementId"),
       userId,
     );
     res.json({ settlement });
@@ -55,7 +55,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthRequest;
     const settlement = await settlementsService.rejectSettlement(
-      req.params.settlementId as string,
+      param(req, "settlementId"),
       userId,
     );
     res.json({ settlement });
@@ -69,7 +69,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthRequest;
     const settlement = await settlementsService.addTxnRef(
-      req.params.settlementId as string,
+      param(req, "settlementId"),
       userId,
       req.body.upi_txn_id,
     );

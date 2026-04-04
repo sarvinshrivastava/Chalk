@@ -1,3 +1,5 @@
+import type { Request, Response, NextFunction } from "express";
+
 export class AppError extends Error {
   constructor(
     public statusCode: number,
@@ -10,17 +12,9 @@ export class AppError extends Error {
 }
 
 export function asyncHandler(
-  fn: (
-    req: import("express").Request,
-    res: import("express").Response,
-    next: import("express").NextFunction,
-  ) => Promise<void>,
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>,
 ) {
-  return (
-    req: import("express").Request,
-    res: import("express").Response,
-    next: import("express").NextFunction,
-  ) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     fn(req, res, next).catch(next);
   };
 }

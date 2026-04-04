@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
-import { validate, validateParams } from "../lib/validate.js";
+import { validate, validateParams, param } from "../lib/validate.js";
 import { asyncHandler } from "../lib/errors.js";
 import {
   createExpenseWithAmountCheck,
@@ -32,7 +32,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { accessToken } = req as AuthRequest;
     const expenses = await expensesService.listGroupExpenses(
-      req.params.groupId as string,
+      param(req, "groupId"),
       accessToken,
     );
     res.json({ expenses });
@@ -45,7 +45,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { accessToken } = req as AuthRequest;
     const expense = await expensesService.getExpense(
-      req.params.expenseId as string,
+      param(req, "expenseId"),
       accessToken,
     );
     res.json({ expense });
@@ -58,7 +58,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const { userId, accessToken } = req as AuthRequest;
     await expensesService.deleteExpense(
-      req.params.expenseId as string,
+      param(req, "expenseId"),
       userId,
       accessToken,
     );

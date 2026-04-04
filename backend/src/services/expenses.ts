@@ -1,5 +1,6 @@
 import { createUserClient, adminClient } from "../lib/supabase.js";
 import { AppError } from "../lib/errors.js";
+import { requireGroupMembership } from "./helpers.js";
 
 interface SplitEntry {
   user_id: string;
@@ -22,15 +23,7 @@ export async function createExpense(
   input: CreateExpenseInput,
 ) {
   const supabase = createUserClient(accessToken);
-  const { data: membership } = await supabase
-    .from("group_members")
-    .select("user_id")
-    .eq("group_id", input.group_id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership)
-    throw new AppError(403, "You are not a member of this group", "NOT_MEMBER");
+  await requireGroupMembership(supabase, input.group_id);
 
   const participantIds = getParticipantIds(input);
   const { data: members } = await adminClient

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
-import { validateParams } from "../lib/validate.js";
+import { validateParams, param } from "../lib/validate.js";
 import { asyncHandler } from "../lib/errors.js";
 import { groupIdParamSchema } from "../schemas/groups.js";
 import * as balancesService from "../services/balances.js";
@@ -14,7 +14,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { accessToken } = req as AuthRequest;
     const result = await balancesService.getGroupBalances(
-      req.params.groupId as string,
+      param(req, "groupId"),
       accessToken,
     );
     res.json(result);

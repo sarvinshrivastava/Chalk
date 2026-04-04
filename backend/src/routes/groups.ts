@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
-import { validate, validateParams } from "../lib/validate.js";
+import { validate, validateParams, param } from "../lib/validate.js";
 import { asyncHandler } from "../lib/errors.js";
 import {
   createGroupSchema,
@@ -40,9 +40,8 @@ router.get(
   validateParams(groupIdParamSchema),
   asyncHandler(async (req, res) => {
     const { accessToken } = req as AuthRequest;
-    // Safe cast: validateParams(groupIdParamSchema) guarantees groupId is a valid UUID string
     const result = await groupsService.getGroupDetail(
-      req.params.groupId as string,
+      param(req, "groupId"),
       accessToken,
     );
     res.json(result);
@@ -55,9 +54,8 @@ router.post(
   validate(inviteMemberSchema),
   asyncHandler(async (req, res) => {
     const { accessToken } = req as AuthRequest;
-    // Safe cast: validateParams(groupIdParamSchema) guarantees groupId is a valid UUID string
     const result = await groupsService.inviteMember(
-      req.params.groupId as string,
+      param(req, "groupId"),
       req.body.phone,
       accessToken,
     );
@@ -70,8 +68,7 @@ router.delete(
   validateParams(groupIdParamSchema),
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthRequest;
-    // Safe cast: validateParams(groupIdParamSchema) guarantees groupId is a valid UUID string
-    await groupsService.leaveGroup(req.params.groupId as string, userId);
+    await groupsService.leaveGroup(param(req, "groupId"), userId);
     res.json({ ok: true });
   }),
 );
@@ -81,8 +78,7 @@ router.delete(
   validateParams(groupIdParamSchema),
   asyncHandler(async (req, res) => {
     const { accessToken } = req as AuthRequest;
-    // Safe cast: validateParams(groupIdParamSchema) guarantees groupId is a valid UUID string
-    await groupsService.deleteGroup(req.params.groupId as string, accessToken);
+    await groupsService.deleteGroup(param(req, "groupId"), accessToken);
     res.json({ ok: true });
   }),
 );
