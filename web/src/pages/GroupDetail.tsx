@@ -1,156 +1,89 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
-import { formatPaise } from "../lib/format";
+import { formatPaise, getErrorMessage } from "../lib/format";
+import {
+  fetchGroupDetail,
+  fetchGroupExpenses,
+  fetchGroupBalances,
+  inviteMember,
+  deleteExpense,
+} from "../lib/services";
+import type {
+  GroupMemberDetail,
+  ExpenseWithDetails,
+  DebtEdge,
+} from "../lib/services";
+import TrashIcon from "../components/icons/TrashIcon";
 import "./GroupDetail.css";
-
-interface Member {
-  id: string;
-  name: string;
-  upi_id: string | null;
-}
-
-interface Expense {
-  id: string;
-  paid_by: string;
-  total_amount: number;
-  description: string;
-  split_type: string;
-  created_at: string;
-  expense_splits: { user_id: string; amount_owed: number }[];
-}
-
-interface DebtEdge {
-  from: string;
-  to: string;
-  amount: number;
-}
 
 export default function GroupDetail() {
   const { groupId } = useParams<{ groupId: string }>();
   const { user } = useAuth();
   const [groupName, setGroupName] = useState("");
-  const [members, setMembers] = useState<Member[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [members, setMembers] = useState<GroupMemberDetail[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseWithDetails[]>([]);
   const [debts, setDebts] = useState<DebtEdge[]>([]);
   const [loading, setLoading] = useState(true);
   const [invitePhone, setInvitePhone] = useState("");
   const [showInvite, setShowInvite] = useState(false);
   const [inviteMsg, setInviteMsg] = useState("");
+  const [error, setError] = useState("");
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     if (!groupId) return;
 
-    const [groupRes, membersRes, expensesRes] = await Promise.all([
-      supabase.from("groups").select("*").eq("id", groupId).single(),
-      supabase
-        .from("group_members")
-        .select("user_id, users(id, name, upi_id)")
-        .eq("group_id", groupId),
-      supabase
-        .from("expenses")
-        .select("*, expense_splits(user_id, amount_owed)")
-        .eq("group_id", groupId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false }),
-    ]);
+    try {
+      const [groupData, expensesData, balancesData] = await Promise.all([
+        fetchGroupDetail(groupId),
+        fetchGroupExpenses(groupId),
+        fetchGroupBalances(groupId),
+      ]);
 
-    if (groupRes.data) setGroupName(groupRes.data.name);
-
-    const memberList = (membersRes.data ?? []).map(
-      (m: any) => m.users as Member
-    );
-    setMembers(memberList);
-    setExpenses(expensesRes.data ?? []);
-
-    // Calculate simplified debts client-side
-    const balances = new Map<string, number>();
-    const add = (id: string, amt: number) =>
-      balances.set(id, (balances.get(id) ?? 0) + amt);
-
-    for (const exp of expensesRes.data ?? []) {
-      add(exp.paid_by, exp.total_amount);
-      for (const split of exp.expense_splits) {
-        add(split.user_id, -split.amount_owed);
-      }
+      setGroupName(groupData.group.name);
+      setMembers(groupData.members);
+      setExpenses(expensesData);
+      setDebts(balancesData.debts);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
     }
-
-    // Fetch confirmed settlements for this group's members
-    const memberIds = memberList.map((m: Member) => m.id);
-    if (memberIds.length > 0) {
-      const { data: settlements } = await supabase
-        .from("settlements")
-        .select("from_user, to_user, amount, status")
-        .in("from_user", memberIds)
-        .in("to_user", memberIds)
-        .eq("status", "confirmed");
-
-      for (const s of settlements ?? []) {
-        add(s.from_user, s.amount);
-        add(s.to_user, -s.amount);
-      }
-    }
-
-    // Simplify
-    const debtors: { id: string; amount: number }[] = [];
-    const creditors: { id: string; amount: number }[] = [];
-    for (const [id, bal] of balances) {
-      if (bal < 0) debtors.push({ id, amount: -bal });
-      else if (bal > 0) creditors.push({ id, amount: bal });
-    }
-    debtors.sort((a, b) => b.amount - a.amount);
-    creditors.sort((a, b) => b.amount - a.amount);
-
-    const edges: DebtEdge[] = [];
-    let i = 0,
-      j = 0;
-    while (i < debtors.length && j < creditors.length) {
-      const amt = Math.min(debtors[i].amount, creditors[j].amount);
-      if (amt > 0) edges.push({ from: debtors[i].id, to: creditors[j].id, amount: amt });
-      debtors[i].amount -= amt;
-      creditors[j].amount -= amt;
-      if (debtors[i].amount === 0) i++;
-      if (creditors[j].amount === 0) j++;
-    }
-    setDebts(edges);
-    setLoading(false);
-  };
+  }, [groupId]);
 
   useEffect(() => {
     fetchAll();
-  }, [groupId]);
+  }, [fetchAll]);
 
+  const nameMap = useMemo(
+    () => new Map(members.map((m) => [m.id, m.name])),
+    [members],
+  );
   const getName = (id: string) =>
-    id === user?.id ? "You" : members.find((m) => m.id === id)?.name ?? "Unknown";
+    id === user?.id ? "You" : (nameMap.get(id) ?? "Unknown");
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setInviteMsg("");
 
-    // Look up user by phone
-    const { data: targetUser } = await supabase
-      .from("users")
-      .select("id")
-      .eq("phone", invitePhone)
-      .single();
-
-    if (!targetUser) {
-      setInviteMsg("No user found with that phone number.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("group_members")
-      .insert({ group_id: groupId!, user_id: targetUser.id });
-
-    if (error) {
-      setInviteMsg(error.message.includes("duplicate") ? "Already a member!" : error.message);
-    } else {
+    try {
+      await inviteMember(groupId!, invitePhone);
       setInviteMsg("Invited!");
       setInvitePhone("");
       setShowInvite(false);
       fetchAll();
+    } catch (err: unknown) {
+      setInviteMsg(getErrorMessage(err));
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    if (!confirm("Delete this expense?")) return;
+    try {
+      await deleteExpense(expenseId);
+      fetchAll();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -158,110 +91,154 @@ export default function GroupDetail() {
 
   return (
     <div className="group-detail">
+      {/* Header — spans full width */}
       <div className="group-detail-header">
-        <Link to="/" className="back-link">&larr; Groups</Link>
-        <h2>{groupName}</h2>
-        <span className="member-count">{members.length} members</span>
+        <div className="group-detail-title">
+          <Link to="/" className="back-btn" aria-label="Back to dashboard">
+            ←
+          </Link>
+          <h2>{groupName}</h2>
+          <span className="member-count">{members.length} members</span>
+        </div>
+        <div className="group-actions">
+          <Link
+            to={`/group/${groupId}/add-expense`}
+            className="btn btn-primary"
+          >
+            + Add expense
+          </Link>
+          <button
+            className="btn btn-outline"
+            onClick={() => setShowInvite(!showInvite)}
+          >
+            Invite member
+          </button>
+        </div>
       </div>
 
-      {/* Balance strip */}
-      {debts.length > 0 && (
+      {error && <p className="error-text">{error}</p>}
+
+      {/* Left column — Activity feed */}
+      <div className="group-detail-main">
+        <div className="activity-feed">
+          <h3>Activity</h3>
+          {expenses.length === 0 ? (
+            <p className="empty-state">No expenses yet. Add one!</p>
+          ) : (
+            expenses.map((exp) => (
+              <div key={exp.id} className="expense-card card">
+                <div className="expense-card-top">
+                  <div>
+                    <div className="expense-desc">
+                      {exp.description || "Expense"}
+                    </div>
+                    <div className="expense-meta">
+                      {exp.users?.name ?? getName(exp.paid_by)} paid &middot;{" "}
+                      {new Date(exp.created_at).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </div>
+                  </div>
+                  <div className="expense-card-right">
+                    <div className="amount">
+                      {formatPaise(exp.total_amount)}
+                    </div>
+                    {exp.paid_by === user?.id && (
+                      <button
+                        className="expense-delete-btn"
+                        title="Delete expense"
+                        onClick={() => handleDeleteExpense(exp.id)}
+                      >
+                        <TrashIcon size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {exp.expense_splits.length > 0 && (
+                  <div className="expense-splits">
+                    {exp.expense_splits.map((s) => (
+                      <div key={s.id || s.user_id} className="split-row">
+                        <span>{getName(s.user_id)}</span>
+                        <span className="amount amount--negative">
+                          {formatPaise(s.amount_owed)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Right column — Balances + Members */}
+      <div className="group-detail-side">
+        {/* Balances card */}
         <div className="balance-strip card">
           <h3>Balances</h3>
-          {debts.map((d, i) => (
-            <div key={i} className="debt-row">
-              <span className="debt-from">{getName(d.from)}</span>
-              <span className="debt-arrow"> owes </span>
-              <span className="debt-to">{getName(d.to)}</span>
-              <span className="amount amount--negative">{formatPaise(d.amount)}</span>
-            </div>
-          ))}
-          <Link
-            to={`/group/${groupId}/settle`}
-            className="btn btn-primary"
-            style={{ marginTop: 12, fontSize: "0.9rem" }}
-          >
-            Settle up
-          </Link>
+          {debts.length === 0 ? (
+            <p className="settled-msg">All settled up!</p>
+          ) : (
+            <>
+              {debts.map((d, i) => (
+                <div key={i} className="debt-row">
+                  <span className="debt-from">
+                    {d.from === user?.id ? "You" : d.from_name}
+                  </span>
+                  <span className="debt-arrow"> owes </span>
+                  <span className="debt-to">
+                    {d.to === user?.id ? "You" : d.to_name}
+                  </span>
+                  <span className="amount amount--negative">
+                    {formatPaise(d.amount)}
+                  </span>
+                </div>
+              ))}
+              <Link
+                to={`/group/${groupId}/settle`}
+                className="btn btn-primary settle-btn"
+              >
+                Settle up
+              </Link>
+            </>
+          )}
         </div>
-      )}
 
-      {/* Actions */}
-      <div className="group-actions">
-        <Link
-          to={`/group/${groupId}/add-expense`}
-          className="btn btn-primary"
-        >
-          + Add expense
-        </Link>
-        <button
-          className="btn btn-outline"
-          onClick={() => setShowInvite(!showInvite)}
-        >
-          Invite member
-        </button>
-      </div>
-
-      {showInvite && (
-        <form onSubmit={handleInvite} className="card invite-form">
-          <div className="form-group">
-            <label>Phone number</label>
-            <input
-              type="tel"
-              value={invitePhone}
-              onChange={(e) => setInvitePhone(e.target.value)}
-              placeholder="+91XXXXXXXXXX"
-              required
-            />
-          </div>
-          {inviteMsg && <p className="invite-msg">{inviteMsg}</p>}
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ fontSize: "0.9rem" }}
-          >
-            Send invite
-          </button>
-        </form>
-      )}
-
-      {/* Activity feed */}
-      <div className="activity-feed">
-        <h3>Activity</h3>
-        {expenses.length === 0 ? (
-          <p className="empty-state">No expenses yet. Add one!</p>
-        ) : (
-          expenses.map((exp) => (
-            <div key={exp.id} className="expense-card card">
-              <div className="expense-card-top">
-                <div>
-                  <div className="expense-desc">
-                    {exp.description || "Expense"}
-                  </div>
-                  <div className="expense-meta">
-                    {getName(exp.paid_by)} paid &middot;{" "}
-                    {new Date(exp.created_at).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </div>
-                </div>
-                <div className="amount">{formatPaise(exp.total_amount)}</div>
+        {/* Members card */}
+        <div className="members-card card">
+          <h3>Members</h3>
+          <div className="members-list">
+            {members.map((m) => (
+              <div key={m.id} className="member-row">
+                <span className="member-name">
+                  {m.id === user?.id ? "You" : m.name}
+                </span>
+                {m.upi_id && <span className="member-upi">{m.upi_id}</span>}
               </div>
-              {exp.expense_splits.length > 0 && (
-                <div className="expense-splits">
-                  {exp.expense_splits.map((s, i) => (
-                    <div key={i} className="split-row">
-                      <span>{getName(s.user_id)}</span>
-                      <span className="amount amount--negative">
-                        {formatPaise(s.amount_owed)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            ))}
+          </div>
+        </div>
+
+        {/* Invite form */}
+        {showInvite && (
+          <form onSubmit={handleInvite} className="card invite-form">
+            <div className="form-group">
+              <label>Phone number</label>
+              <input
+                type="tel"
+                value={invitePhone}
+                onChange={(e) => setInvitePhone(e.target.value)}
+                placeholder="+91XXXXXXXXXX"
+                required
+              />
             </div>
-          ))
+            {inviteMsg && <p className="invite-msg">{inviteMsg}</p>}
+            <button type="submit" className="btn btn-primary">
+              Send invite
+            </button>
+          </form>
         )}
       </div>
     </div>
