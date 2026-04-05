@@ -1,0 +1,26 @@
+<h2>How should Chalk handle mobile/tablet navigation?</h2>
+<p class="subtitle">The sidebar (groups list) is hidden below 1024px with no alternative. What scope makes sense?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Minimal fix — just unblock navigation</h3>
+      <p>Add a hamburger/drawer toggle so users can access the groups sidebar on small screens. Keep the existing layout, just make it accessible. Smallest scope, least disruption.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Mobile-adapted — rethink the layout for small screens</h3>
+      <p>Replace the sidebar with a mobile-native pattern: bottom tab bar, top dropdown, or a groups list as the default mobile "home" view. More polished feel, more work.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Full responsive redesign — desktop + mobile optimized</h3>
+      <p>Redesign layout for all breakpoints: desktop stays as-is, tablet gets a collapsible sidebar, mobile gets a completely different navigation pattern (bottom tabs, swipe gestures, etc).</p>
+    </div>
+  </div>
+</div>

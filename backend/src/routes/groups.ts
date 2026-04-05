@@ -16,12 +16,8 @@ router.post(
   "/",
   validate(createGroupSchema),
   asyncHandler(async (req, res) => {
-    const { userId, accessToken } = req as AuthRequest;
-    const group = await groupsService.createGroup(
-      userId,
-      accessToken,
-      req.body.name,
-    );
+    const { userId } = req as AuthRequest;
+    const group = await groupsService.createGroup(userId, req.body.name);
     res.status(201).json({ group });
   }),
 );
@@ -29,8 +25,8 @@ router.post(
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    const { accessToken } = req as AuthRequest;
-    const groups = await groupsService.listGroups(accessToken);
+    const { userId } = req as AuthRequest;
+    const groups = await groupsService.listGroups(userId);
     res.json({ groups });
   }),
 );
@@ -39,10 +35,10 @@ router.get(
   "/:groupId",
   validateParams(groupIdParamSchema),
   asyncHandler(async (req, res) => {
-    const { accessToken } = req as AuthRequest;
+    const { userId } = req as AuthRequest;
     const result = await groupsService.getGroupDetail(
       param(req, "groupId"),
-      accessToken,
+      userId,
     );
     res.json(result);
   }),
@@ -53,11 +49,11 @@ router.post(
   validateParams(groupIdParamSchema),
   validate(inviteMemberSchema),
   asyncHandler(async (req, res) => {
-    const { accessToken } = req as AuthRequest;
+    const { userId } = req as AuthRequest;
     const result = await groupsService.inviteMember(
       param(req, "groupId"),
       req.body.phone,
-      accessToken,
+      userId,
     );
     res.status(201).json({ ok: true, ...result });
   }),
@@ -77,8 +73,8 @@ router.delete(
   "/:groupId",
   validateParams(groupIdParamSchema),
   asyncHandler(async (req, res) => {
-    const { accessToken } = req as AuthRequest;
-    await groupsService.deleteGroup(param(req, "groupId"), accessToken);
+    const { userId } = req as AuthRequest;
+    await groupsService.deleteGroup(param(req, "groupId"), userId);
     res.json({ ok: true });
   }),
 );

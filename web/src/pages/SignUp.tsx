@@ -39,7 +39,11 @@ export default function SignUp() {
           <p style={{ color: "var(--ink-muted)", marginTop: 8 }}>
             We sent a confirmation link to <strong>{email}</strong>
           </p>
-          <Link to="/login" className="btn btn-primary" style={{ marginTop: 24 }}>
+          <Link
+            to="/login"
+            className="btn btn-primary btn--full"
+            style={{ marginTop: 24 }}
+          >
             Back to login
           </Link>
         </div>
@@ -90,7 +94,11 @@ export default function SignUp() {
 
           {error && <p className="error-text">{error}</p>}
 
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button
+            type="submit"
+            className="btn btn-primary btn--full"
+            disabled={loading}
+          >
             {loading ? "Creating account..." : "Create account"}
           </button>
         </form>
@@ -99,7 +107,10 @@ export default function SignUp() {
           <span>or</span>
         </div>
 
-        <button className="btn btn-outline" onClick={signInWithGoogle}>
+        <button
+          className="btn btn-outline btn--full"
+          onClick={signInWithGoogle}
+        >
           Continue with Google
         </button>
 

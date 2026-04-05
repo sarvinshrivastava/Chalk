@@ -1,22 +1,27 @@
 .add-expense {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  max-width: 720px;
 }
 
 .add-expense h2 {
   font-weight: 700;
   font-size: 1.3rem;
+  margin-bottom: 20px;
 }
 
+/* Two-column form layout */
 .expense-form {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
 }
 
+/* Left column — inputs */
+.expense-form .form-group {
+  margin-bottom: 0;
+}
+
+/* Right column — split section */
 .split-section {
-  margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -39,7 +44,7 @@
   border: 1.5px solid var(--border);
   border-radius: 20px;
   background: var(--white);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -57,12 +62,25 @@
   font-weight: 500;
 }
 
+/* Error + actions span full width */
+.expense-form .error-text {
+  grid-column: 1 / -1;
+}
+
 .expense-form-actions {
+  grid-column: 1 / -1;
   display: flex;
   gap: 10px;
-  margin-top: 16px;
+  justify-content: flex-end;
 }
 
 .expense-form-actions .btn {
-  flex: 1;
+  min-width: 120px;
+}
+
+/* Sub-1024px — single column form */
+@media (max-width: 1023px) {
+  .expense-form {
+    grid-template-columns: 1fr;
+  }
 }

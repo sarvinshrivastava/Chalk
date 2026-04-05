@@ -1,21 +1,20 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { adminClient } from "../lib/supabase.js";
+import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
+import type { SettlementStatus } from "@chalk/shared";
 
-/** Verify the current user is a member of the given group (via RLS). */
+/** Verify the current user is a member of the given group. */
 export async function requireGroupMembership(
-  supabase: SupabaseClient,
   groupId: string,
+  userId: string,
 ): Promise<void> {
-  const { data } = await supabase
-    .from("group_members")
-    .select("user_id")
-    .eq("group_id", groupId)
-    .limit(1)
-    .maybeSingle();
+  const member = await prisma.group_members.findUnique({
+    where: { group_id_user_id: { group_id: groupId, user_id: userId } },
+    select: { user_id: true },
+  });
 
-  if (!data)
+  if (!member) {
     throw new AppError(403, "You are not a member of this group", "NOT_MEMBER");
+  }
 }
 
 /**
@@ -26,15 +25,14 @@ export async function fetchPendingSettlement(
   settlementId: string,
   userId: string,
   role: "payee" | "payer",
-): Promise<Record<string, unknown>> {
-  const { data: settlement } = await adminClient
-    .from("settlements")
-    .select("*")
-    .eq("id", settlementId)
-    .single();
+) {
+  const settlement = await prisma.settlements.findUnique({
+    where: { id: settlementId },
+  });
 
-  if (!settlement)
+  if (!settlement) {
     throw new AppError(404, "Settlement not found", "SETTLEMENT_NOT_FOUND");
+  }
 
   const roleField = role === "payee" ? "to_user" : "from_user";
   const roleLabel = role === "payee" ? "payee" : "payer";
@@ -47,7 +45,10 @@ export async function fetchPendingSettlement(
     );
   }
 
-  if (role === "payee" && settlement.status !== "pending") {
+  if (
+    role === "payee" &&
+    (settlement.status as SettlementStatus) !== "pending"
+  ) {
     throw new AppError(
       409,
       `Settlement is already ${settlement.status}`,

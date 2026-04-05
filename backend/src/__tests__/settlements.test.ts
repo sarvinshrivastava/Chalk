@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import app from "../index.js";
 import {
-  mockUserClient,
-  mockAdminClient,
+  mockPrisma,
   authenticateAs,
   AUTH_HEADER,
   TEST_USER_ID,
@@ -19,23 +18,21 @@ describe("Settlements routes", () => {
   // ── POST /settlements ───────────────────────────────────────
   describe("POST /settlements", () => {
     it("returns 201 on successful settlement creation", async () => {
-      // adminClient: find payee
-      mockAdminClient.single
-        .mockResolvedValueOnce({
-          data: { id: TEST_USER_ID_2, name: "Bob", upi_id: "bob@upi" },
-          error: null,
-        })
-        // adminClient: insert settlement -> .select().single()
-        .mockResolvedValueOnce({
-          data: {
-            id: TEST_SETTLEMENT_ID,
-            from_user: TEST_USER_ID,
-            to_user: TEST_USER_ID_2,
-            amount: 5000,
-            status: "pending",
-          },
-          error: null,
-        });
+      // Find payee
+      mockPrisma.users.findUnique.mockResolvedValue({
+        id: TEST_USER_ID_2,
+        name: "Bob",
+        upi_id: "bob@upi",
+      });
+
+      const fakeSettlement = {
+        id: TEST_SETTLEMENT_ID,
+        from_user: TEST_USER_ID,
+        to_user: TEST_USER_ID_2,
+        amount: 5000,
+        status: "pending",
+      };
+      mockPrisma.settlements.create.mockResolvedValue(fakeSettlement);
 
       const res = await request(app)
         .post("/settlements")
@@ -91,26 +88,24 @@ describe("Settlements routes", () => {
   // ── PATCH /settlements/:id/confirm ──────────────────────────
   describe("PATCH /settlements/:settlementId/confirm", () => {
     it("returns 200 on successful confirmation", async () => {
-      // fetchPendingSettlement via adminClient
-      mockAdminClient.single
-        .mockResolvedValueOnce({
-          data: {
-            id: TEST_SETTLEMENT_ID,
-            from_user: TEST_USER_ID_2,
-            to_user: TEST_USER_ID,
-            status: "pending",
-          },
-          error: null,
-        })
-        // confirmSettlement update -> .select().single()
-        .mockResolvedValueOnce({
-          data: {
-            id: TEST_SETTLEMENT_ID,
-            status: "confirmed",
-            paid_at: "2025-01-01T00:00:00Z",
-          },
-          error: null,
-        });
+      // fetchPendingSettlement
+      mockPrisma.settlements.findUnique.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        from_user: TEST_USER_ID_2,
+        to_user: TEST_USER_ID,
+        amount: 5000,
+        status: "pending",
+        upi_txn_id: null,
+        paid_at: null,
+        created_at: new Date(),
+        deleted_at: null,
+      });
+
+      mockPrisma.settlements.update.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        status: "confirmed",
+        paid_at: "2025-01-01T00:00:00Z",
+      });
 
       const res = await request(app)
         .patch(`/settlements/${TEST_SETTLEMENT_ID}/confirm`)
@@ -121,15 +116,16 @@ describe("Settlements routes", () => {
     });
 
     it("returns 403 when user is not the payee", async () => {
-      // Settlement where current user is the payer, not the payee
-      mockAdminClient.single.mockResolvedValueOnce({
-        data: {
-          id: TEST_SETTLEMENT_ID,
-          from_user: TEST_USER_ID,
-          to_user: TEST_USER_ID_2,
-          status: "pending",
-        },
-        error: null,
+      mockPrisma.settlements.findUnique.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        from_user: TEST_USER_ID,
+        to_user: TEST_USER_ID_2,
+        amount: 5000,
+        status: "pending",
+        upi_txn_id: null,
+        paid_at: null,
+        created_at: new Date(),
+        deleted_at: null,
       });
 
       const res = await request(app)
@@ -141,14 +137,16 @@ describe("Settlements routes", () => {
     });
 
     it("returns 409 when settlement is already confirmed", async () => {
-      mockAdminClient.single.mockResolvedValueOnce({
-        data: {
-          id: TEST_SETTLEMENT_ID,
-          from_user: TEST_USER_ID_2,
-          to_user: TEST_USER_ID,
-          status: "confirmed",
-        },
-        error: null,
+      mockPrisma.settlements.findUnique.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        from_user: TEST_USER_ID_2,
+        to_user: TEST_USER_ID,
+        amount: 5000,
+        status: "confirmed",
+        upi_txn_id: null,
+        paid_at: null,
+        created_at: new Date(),
+        deleted_at: null,
       });
 
       const res = await request(app)
@@ -163,20 +161,22 @@ describe("Settlements routes", () => {
   // ── PATCH /settlements/:id/reject ───────────────────────────
   describe("PATCH /settlements/:settlementId/reject", () => {
     it("returns 200 on successful rejection", async () => {
-      mockAdminClient.single
-        .mockResolvedValueOnce({
-          data: {
-            id: TEST_SETTLEMENT_ID,
-            from_user: TEST_USER_ID_2,
-            to_user: TEST_USER_ID,
-            status: "pending",
-          },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { id: TEST_SETTLEMENT_ID, status: "rejected" },
-          error: null,
-        });
+      mockPrisma.settlements.findUnique.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        from_user: TEST_USER_ID_2,
+        to_user: TEST_USER_ID,
+        amount: 5000,
+        status: "pending",
+        upi_txn_id: null,
+        paid_at: null,
+        created_at: new Date(),
+        deleted_at: null,
+      });
+
+      mockPrisma.settlements.update.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        status: "rejected",
+      });
 
       const res = await request(app)
         .patch(`/settlements/${TEST_SETTLEMENT_ID}/reject`)
@@ -187,14 +187,16 @@ describe("Settlements routes", () => {
     });
 
     it("returns 403 when user is not the payee", async () => {
-      mockAdminClient.single.mockResolvedValueOnce({
-        data: {
-          id: TEST_SETTLEMENT_ID,
-          from_user: TEST_USER_ID,
-          to_user: TEST_USER_ID_2,
-          status: "pending",
-        },
-        error: null,
+      mockPrisma.settlements.findUnique.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        from_user: TEST_USER_ID,
+        to_user: TEST_USER_ID_2,
+        amount: 5000,
+        status: "pending",
+        upi_txn_id: null,
+        paid_at: null,
+        created_at: new Date(),
+        deleted_at: null,
       });
 
       const res = await request(app)
@@ -209,20 +211,22 @@ describe("Settlements routes", () => {
   // ── PATCH /settlements/:id/txn-ref ──────────────────────────
   describe("PATCH /settlements/:settlementId/txn-ref", () => {
     it("returns 200 on successful txn ref addition", async () => {
-      mockAdminClient.single
-        .mockResolvedValueOnce({
-          data: {
-            id: TEST_SETTLEMENT_ID,
-            from_user: TEST_USER_ID,
-            to_user: TEST_USER_ID_2,
-            status: "pending",
-          },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { id: TEST_SETTLEMENT_ID, upi_txn_id: "TXN123" },
-          error: null,
-        });
+      mockPrisma.settlements.findUnique.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        from_user: TEST_USER_ID,
+        to_user: TEST_USER_ID_2,
+        amount: 5000,
+        status: "pending",
+        upi_txn_id: null,
+        paid_at: null,
+        created_at: new Date(),
+        deleted_at: null,
+      });
+
+      mockPrisma.settlements.update.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        upi_txn_id: "TXN123",
+      });
 
       const res = await request(app)
         .patch(`/settlements/${TEST_SETTLEMENT_ID}/txn-ref`)
@@ -234,15 +238,16 @@ describe("Settlements routes", () => {
     });
 
     it("returns 403 when user is not the payer", async () => {
-      // Current user is the payee, not the payer
-      mockAdminClient.single.mockResolvedValueOnce({
-        data: {
-          id: TEST_SETTLEMENT_ID,
-          from_user: TEST_USER_ID_2,
-          to_user: TEST_USER_ID,
-          status: "pending",
-        },
-        error: null,
+      mockPrisma.settlements.findUnique.mockResolvedValue({
+        id: TEST_SETTLEMENT_ID,
+        from_user: TEST_USER_ID_2,
+        to_user: TEST_USER_ID,
+        amount: 5000,
+        status: "pending",
+        upi_txn_id: null,
+        paid_at: null,
+        created_at: new Date(),
+        deleted_at: null,
       });
 
       const res = await request(app)
@@ -271,8 +276,7 @@ describe("Settlements routes", () => {
       const fakeSettlements = [
         { id: TEST_SETTLEMENT_ID, from_user: TEST_USER_ID, amount: 5000 },
       ];
-      mockUserClient.then = (resolve: (v: unknown) => unknown) =>
-        resolve({ data: fakeSettlements, error: null });
+      mockPrisma.settlements.findMany.mockResolvedValue(fakeSettlements);
 
       const res = await request(app)
         .get("/settlements")

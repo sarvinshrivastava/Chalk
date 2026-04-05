@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import app from "../index.js";
 import {
-  mockUserClient,
-  mockAdminClient,
+  mockPrisma,
   authenticateAs,
   AUTH_HEADER,
   TEST_USER_ID,
@@ -24,13 +23,9 @@ describe("Groups routes", () => {
         created_by: TEST_USER_ID,
       };
 
-      // rpc("create_group_with_member") returns the group ID
-      mockUserClient.rpc.mockResolvedValue({
-        data: TEST_GROUP_ID,
-        error: null,
-      });
-      // The subsequent .from("groups").select().eq().single() returns the group
-      mockUserClient.single.mockResolvedValue({ data: fakeGroup, error: null });
+      // $transaction executes callback; inside it calls groups.create and group_members.create
+      mockPrisma.groups.create.mockResolvedValue(fakeGroup);
+      mockPrisma.group_members.create.mockResolvedValue({});
 
       const res = await request(app)
         .post("/groups")
@@ -71,9 +66,9 @@ describe("Groups routes", () => {
   // ── GET /groups ─────────────────────────────────────────────
   describe("GET /groups", () => {
     it("returns list of groups", async () => {
-      const fakeData = [
+      mockPrisma.group_members.findMany.mockResolvedValue([
         {
-          group_id: TEST_GROUP_ID,
+          user_id: TEST_USER_ID,
           joined_at: "2025-01-01T00:00:00Z",
           groups: {
             id: TEST_GROUP_ID,
@@ -82,13 +77,7 @@ describe("Groups routes", () => {
             created_at: "2025-01-01",
           },
         },
-      ];
-
-      // listGroups calls .from().select().order() which is thenable (no terminal)
-      // We need the chain's then to resolve with the data
-      const resolveValue = { data: fakeData, error: null };
-      mockUserClient.then = (resolve: (v: unknown) => unknown) =>
-        resolve(resolveValue);
+      ]);
 
       const res = await request(app)
         .get("/groups")
@@ -111,22 +100,20 @@ describe("Groups routes", () => {
   describe("GET /groups/:groupId", () => {
     it("returns group detail", async () => {
       const fakeGroup = { id: TEST_GROUP_ID, name: "Trip" };
-      const fakeMembers = [
+
+      // requireGroupMembership
+      mockPrisma.group_members.findUnique.mockResolvedValue({
+        user_id: TEST_USER_ID,
+      });
+
+      mockPrisma.groups.findUnique.mockResolvedValue(fakeGroup);
+      mockPrisma.group_members.findMany.mockResolvedValue([
         {
           user_id: TEST_USER_ID,
           joined_at: "2025-01-01",
           users: { id: TEST_USER_ID, name: "User", upi_id: null },
         },
-      ];
-
-      // getGroupDetail uses Promise.all with two queries:
-      // 1. .from("groups").select().eq().single()
-      // 2. .from("group_members").select().eq() (thenable, no terminal)
-      // Both go through the same mockUserClient chain.
-      // single() resolves first query, then() resolves second.
-      mockUserClient.single.mockResolvedValue({ data: fakeGroup, error: null });
-      mockUserClient.then = (resolve: (v: unknown) => unknown) =>
-        resolve({ data: fakeMembers, error: null });
+      ]);
 
       const res = await request(app)
         .get(`/groups/${TEST_GROUP_ID}`)
@@ -159,25 +146,19 @@ describe("Groups routes", () => {
     it("returns 201 on successful invite", async () => {
       const targetUserId = "00000000-0000-0000-0000-000000000099";
 
-      // adminClient: find user by phone
-      mockAdminClient.single.mockResolvedValue({
-        data: { id: targetUserId },
-        error: null,
-      });
-      // adminClient: count members (head query) — thenable
-      mockAdminClient.then = (resolve: (v: unknown) => unknown) =>
-        resolve({ count: 2, data: null, error: null });
-      // adminClient: check existing membership
-      mockAdminClient.maybeSingle.mockResolvedValue({
-        data: null,
-        error: null,
-      });
+      // requireGroupMembership
+      mockPrisma.group_members.findUnique
+        .mockResolvedValueOnce({ user_id: TEST_USER_ID }) // membership check
+        .mockResolvedValueOnce(null); // existing member check (not a member yet)
 
-      // userClient: requireGroupMembership
-      mockUserClient.maybeSingle.mockResolvedValue({
-        data: { user_id: TEST_USER_ID },
-        error: null,
-      });
+      // Find target user by phone
+      mockPrisma.users.findFirst.mockResolvedValue({ id: targetUserId });
+
+      // Count members
+      mockPrisma.group_members.count.mockResolvedValue(2);
+
+      // Create member
+      mockPrisma.group_members.create.mockResolvedValue({});
 
       const res = await request(app)
         .post(`/groups/${TEST_GROUP_ID}/invite`)
@@ -202,21 +183,13 @@ describe("Groups routes", () => {
     it("returns 409 when user is already a member", async () => {
       const targetUserId = "00000000-0000-0000-0000-000000000099";
 
-      mockAdminClient.single.mockResolvedValue({
-        data: { id: targetUserId },
-        error: null,
-      });
-      mockAdminClient.then = (resolve: (v: unknown) => unknown) =>
-        resolve({ count: 2, data: null, error: null });
-      mockAdminClient.maybeSingle.mockResolvedValue({
-        data: { user_id: targetUserId },
-        error: null,
-      });
+      // requireGroupMembership
+      mockPrisma.group_members.findUnique
+        .mockResolvedValueOnce({ user_id: TEST_USER_ID }) // membership check
+        .mockResolvedValueOnce({ user_id: targetUserId }); // existing member (already a member)
 
-      mockUserClient.maybeSingle.mockResolvedValue({
-        data: { user_id: TEST_USER_ID },
-        error: null,
-      });
+      mockPrisma.users.findFirst.mockResolvedValue({ id: targetUserId });
+      mockPrisma.group_members.count.mockResolvedValue(2);
 
       const res = await request(app)
         .post(`/groups/${TEST_GROUP_ID}/invite`)
@@ -231,9 +204,7 @@ describe("Groups routes", () => {
   // ── DELETE /groups/:groupId/leave ───────────────────────────
   describe("DELETE /groups/:groupId/leave", () => {
     it("returns 200 on successful leave", async () => {
-      // adminClient delete chain is thenable
-      mockAdminClient.then = (resolve: (v: unknown) => unknown) =>
-        resolve({ error: null });
+      mockPrisma.group_members.delete.mockResolvedValue({});
 
       const res = await request(app)
         .delete(`/groups/${TEST_GROUP_ID}/leave`)
@@ -247,7 +218,13 @@ describe("Groups routes", () => {
   // ── DELETE /groups/:groupId ─────────────────────────────────
   describe("DELETE /groups/:groupId", () => {
     it("returns 200 on successful delete", async () => {
-      mockUserClient.rpc.mockResolvedValue({ data: null, error: null });
+      mockPrisma.groups.findUnique.mockResolvedValue({
+        created_by: TEST_USER_ID,
+      });
+      mockPrisma.expense_splits.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.expenses.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.group_members.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.groups.delete.mockResolvedValue({});
 
       const res = await request(app)
         .delete(`/groups/${TEST_GROUP_ID}`)

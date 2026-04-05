@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import app from "../index.js";
 import {
-  mockUserClient,
-  mockAdminClient,
+  mockPrisma,
   authenticateAs,
   AUTH_HEADER,
   TEST_USER_ID,
@@ -19,14 +18,13 @@ describe("Balances routes", () => {
   // ── GET /balances/group/:groupId ────────────────────────────
   describe("GET /balances/group/:groupId", () => {
     it("returns balances and simplified debts", async () => {
-      // The service does multiple queries via Promise.all.
-      // userClient queries: group_members, expenses, expense_splits (all thenable)
-      // adminClient query: settlements (thenable)
+      // requireGroupMembership
+      mockPrisma.group_members.findUnique.mockResolvedValue({
+        user_id: TEST_USER_ID,
+      });
 
-      // First call: group_members select — thenable
-      // Because multiple queries chain through the same mock, we configure
-      // the thenable to return members data for the first resolution.
-      const membersData = [
+      // getGroupBalances queries
+      mockPrisma.group_members.findMany.mockResolvedValue([
         {
           user_id: TEST_USER_ID,
           users: { id: TEST_USER_ID, name: "Alice", upi_id: "alice@upi" },
@@ -35,17 +33,11 @@ describe("Balances routes", () => {
           user_id: TEST_USER_ID_2,
           users: { id: TEST_USER_ID_2, name: "Bob", upi_id: null },
         },
-      ];
+      ]);
 
-      // Since all queries go through the same chain mock and resolve via .then,
-      // we need them all to succeed. The simplest approach: make the thenable
-      // return empty arrays for expenses/splits so balances are all zero.
-      mockUserClient.then = (resolve: (v: unknown) => unknown) =>
-        resolve({ data: membersData, error: null });
-
-      // adminClient thenable for settlements query
-      mockAdminClient.then = (resolve: (v: unknown) => unknown) =>
-        resolve({ data: [], error: null });
+      mockPrisma.expenses.findMany.mockResolvedValue([]);
+      mockPrisma.expense_splits.findMany.mockResolvedValue([]);
+      mockPrisma.settlements.findMany.mockResolvedValue([]);
 
       const res = await request(app)
         .get(`/balances/group/${TEST_GROUP_ID}`)

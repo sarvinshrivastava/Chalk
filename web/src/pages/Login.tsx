@@ -57,7 +57,11 @@ export default function Login() {
 
           {error && <p className="error-text">{error}</p>}
 
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button
+            type="submit"
+            className="btn btn-primary btn--full"
+            disabled={loading}
+          >
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
@@ -66,7 +70,10 @@ export default function Login() {
           <span>or</span>
         </div>
 
-        <button className="btn btn-outline" onClick={signInWithGoogle}>
+        <button
+          className="btn btn-outline btn--full"
+          onClick={signInWithGoogle}
+        >
           Continue with Google
         </button>
 

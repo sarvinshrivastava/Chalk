@@ -16,12 +16,8 @@ router.post(
   "/",
   validate(createExpenseWithAmountCheck),
   asyncHandler(async (req, res) => {
-    const { userId, accessToken } = req as AuthRequest;
-    const result = await expensesService.createExpense(
-      userId,
-      accessToken,
-      req.body,
-    );
+    const { userId } = req as AuthRequest;
+    const result = await expensesService.createExpense(userId, req.body);
     res.status(201).json(result);
   }),
 );
@@ -30,10 +26,10 @@ router.get(
   "/group/:groupId",
   validateParams(groupExpensesParamSchema),
   asyncHandler(async (req, res) => {
-    const { accessToken } = req as AuthRequest;
+    const { userId } = req as AuthRequest;
     const expenses = await expensesService.listGroupExpenses(
       param(req, "groupId"),
-      accessToken,
+      userId,
     );
     res.json({ expenses });
   }),
@@ -43,10 +39,10 @@ router.get(
   "/:expenseId",
   validateParams(expenseIdParamSchema),
   asyncHandler(async (req, res) => {
-    const { accessToken } = req as AuthRequest;
+    const { userId } = req as AuthRequest;
     const expense = await expensesService.getExpense(
       param(req, "expenseId"),
-      accessToken,
+      userId,
     );
     res.json({ expense });
   }),
@@ -56,12 +52,8 @@ router.delete(
   "/:expenseId",
   validateParams(expenseIdParamSchema),
   asyncHandler(async (req, res) => {
-    const { userId, accessToken } = req as AuthRequest;
-    await expensesService.deleteExpense(
-      param(req, "expenseId"),
-      userId,
-      accessToken,
-    );
+    const { userId } = req as AuthRequest;
+    await expensesService.deleteExpense(param(req, "expenseId"), userId);
     res.json({ ok: true });
   }),
 );

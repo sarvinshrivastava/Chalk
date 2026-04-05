@@ -70,8 +70,8 @@ router.get(
   "/me",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { userId, accessToken } = req as AuthRequest;
-    const user = await authService.getProfile(userId, accessToken);
+    const { userId } = req as AuthRequest;
+    const user = await authService.getProfile(userId);
     res.json({ user });
   }),
 );
@@ -81,8 +81,8 @@ router.patch(
   requireAuth,
   validate(updateProfileSchema),
   asyncHandler(async (req, res) => {
-    const { userId, accessToken } = req as AuthRequest;
-    const user = await authService.updateProfile(userId, accessToken, req.body);
+    const { userId } = req as AuthRequest;
+    const user = await authService.updateProfile(userId, req.body);
     res.json({ user });
   }),
 );

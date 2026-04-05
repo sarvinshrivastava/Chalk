@@ -1,5 +1,6 @@
 import { adminClient, createUserClient } from "../lib/supabase.js";
-import { AppError } from "../lib/errors.js";
+import { prisma } from "../lib/prisma.js";
+import { AppError, withPrismaErrors } from "../lib/errors.js";
 
 export async function signUpWithEmail(
   email: string,
@@ -16,12 +17,11 @@ export async function signUpWithEmail(
   if (!data.user)
     throw new AppError(500, "User creation failed", "SIGNUP_NO_USER");
 
-  await adminClient
-    .from("users")
-    .upsert(
-      { id: data.user.id, name, auth_provider: "email" },
-      { onConflict: "id" },
-    );
+  await prisma.users.upsert({
+    where: { id: data.user.id },
+    update: { name, auth_provider: "email" },
+    create: { id: data.user.id, name, auth_provider: "email" },
+  });
 
   return { user: data.user, session: data.session };
 }
@@ -48,12 +48,12 @@ export async function signInWithOAuth(
   }
 
   const displayName = name || data.user.user_metadata?.full_name || "User";
-  await adminClient
-    .from("users")
-    .upsert(
-      { id: data.user.id, name: displayName, auth_provider: provider },
-      { onConflict: "id" },
-    );
+
+  await prisma.users.upsert({
+    where: { id: data.user.id },
+    update: { name: displayName, auth_provider: provider },
+    create: { id: data.user.id, name: displayName, auth_provider: provider },
+  });
 
   return { user: data.user };
 }
@@ -71,31 +71,30 @@ export async function signOut(accessToken: string) {
   await supabase.auth.signOut();
 }
 
-export async function getProfile(userId: string, accessToken: string) {
-  const supabase = createUserClient(accessToken);
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", userId)
-    .single();
-  if (error || !data)
+export async function getProfile(userId: string) {
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      upi_id: true,
+      phone: true,
+      created_at: true,
+    },
+  });
+
+  if (!user) {
     throw new AppError(404, "User not found", "USER_NOT_FOUND");
-  return data;
+  }
+
+  return user;
 }
 
 export async function updateProfile(
   userId: string,
-  accessToken: string,
   updates: { name?: string; upi_id?: string | null; phone?: string | null },
 ) {
-  const supabase = createUserClient(accessToken);
-  const { data, error } = await supabase
-    .from("users")
-    .update(updates)
-    .eq("id", userId)
-    .select()
-    .single();
-
-  if (error) throw new AppError(400, error.message, "PROFILE_UPDATE_FAILED");
-  return data;
+  return withPrismaErrors(() =>
+    prisma.users.update({ where: { id: userId }, data: updates }),
+  );
 }

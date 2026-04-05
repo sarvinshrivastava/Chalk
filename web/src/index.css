@@ -20,6 +20,10 @@
   --font: "DM Sans", system-ui, -apple-system, sans-serif;
   --radius: 12px;
   --radius-sm: 8px;
+
+  /* Desktop layout */
+  --sidebar-width: 260px;
+  --header-height: 56px;
 }
 
 *,
@@ -31,7 +35,7 @@
 }
 
 html {
-  font-size: 15px;
+  font-size: 16px;
 }
 
 body {

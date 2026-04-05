@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import app from "../index.js";
 import {
-  mockUserClient,
-  mockAdminClient,
+  mockPrisma,
+  mockAdminClientAuth,
+  mockUserClientAuth,
   authenticateAs,
   AUTH_HEADER,
   TEST_USER_ID,
@@ -16,10 +17,13 @@ describe("Auth routes", () => {
       const fakeUser = { id: TEST_USER_ID, email: "new@test.com" };
       const fakeSession = { access_token: "tok", refresh_token: "ref" };
 
-      mockAdminClient.auth.signUp.mockResolvedValue({
+      mockAdminClientAuth.signUp.mockResolvedValue({
         data: { user: fakeUser, session: fakeSession },
         error: null,
       });
+
+      // Prisma upsert for user row
+      mockPrisma.users.upsert.mockResolvedValue({});
 
       const res = await request(app).post("/auth/signup/email").send({
         email: "new@test.com",
@@ -87,7 +91,7 @@ describe("Auth routes", () => {
       const fakeUser = { id: TEST_USER_ID, email: "user@test.com" };
       const fakeSession = { access_token: "tok" };
 
-      mockAdminClient.auth.signInWithPassword.mockResolvedValue({
+      mockAdminClientAuth.signInWithPassword.mockResolvedValue({
         data: { user: fakeUser, session: fakeSession },
         error: null,
       });
@@ -102,7 +106,7 @@ describe("Auth routes", () => {
     });
 
     it("returns 401 on wrong password", async () => {
-      mockAdminClient.auth.signInWithPassword.mockResolvedValue({
+      mockAdminClientAuth.signInWithPassword.mockResolvedValue({
         data: { user: null, session: null },
         error: { message: "Invalid login credentials" },
       });
@@ -126,10 +130,14 @@ describe("Auth routes", () => {
         user_metadata: { full_name: "OAuth User" },
       };
 
-      mockUserClient.auth.getUser.mockResolvedValue({
+      // signInWithOAuth uses createUserClient(access_token) then getUser
+      mockUserClientAuth.getUser.mockResolvedValue({
         data: { user: fakeUser },
         error: null,
       });
+
+      // Prisma upsert
+      mockPrisma.users.upsert.mockResolvedValue({});
 
       const res = await request(app).post("/auth/signin/oauth").send({
         access_token: "valid-oauth-token",
@@ -142,7 +150,7 @@ describe("Auth routes", () => {
     });
 
     it("returns 401 on invalid OAuth token", async () => {
-      mockUserClient.auth.getUser.mockResolvedValue({
+      mockUserClientAuth.getUser.mockResolvedValue({
         data: { user: null },
         error: { message: "Invalid token" },
       });
@@ -172,7 +180,7 @@ describe("Auth routes", () => {
     it("returns 200 on successful refresh", async () => {
       const fakeSession = { access_token: "new-tok", refresh_token: "new-ref" };
 
-      mockAdminClient.auth.refreshSession.mockResolvedValue({
+      mockAdminClientAuth.refreshSession.mockResolvedValue({
         data: { session: fakeSession },
         error: null,
       });
@@ -199,10 +207,7 @@ describe("Auth routes", () => {
       authenticateAs(TEST_USER_ID);
 
       const fakeProfile = { id: TEST_USER_ID, name: "Test User", upi_id: null };
-      mockUserClient.single.mockResolvedValue({
-        data: fakeProfile,
-        error: null,
-      });
+      mockPrisma.users.findUnique.mockResolvedValue(fakeProfile);
 
       const res = await request(app)
         .get("/auth/me")
@@ -228,7 +233,7 @@ describe("Auth routes", () => {
 
     it("updates name successfully", async () => {
       const updated = { id: TEST_USER_ID, name: "New Name", upi_id: null };
-      mockUserClient.single.mockResolvedValue({ data: updated, error: null });
+      mockPrisma.users.update.mockResolvedValue(updated);
 
       const res = await request(app)
         .patch("/auth/me")

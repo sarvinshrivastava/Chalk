@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        {
+          "name": "sb-krejurnqoyqraeydmvlx-auth-token",
+          "value": "{\"access_token\":\"eyJhbGciOiJFUzI1NiIsImtpZCI6IjA4YmExNjYxLWZjYzUtNDFlZC1iNGQ2LTUyYjVjMzZkNzllMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2tyZWp1cm5xb3lxcmFleWRtdmx4LnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI1NDkzYTk5NS0wMjgwLTRhOGMtYmUwNy0xMDYwMTA2MTExYjEiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzc1MzcwMDY2LCJpYXQiOjE3NzUzNjY0NjYsImVtYWlsIjoidGVzdEB0ZXN0LmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWV9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzc1MzY2NDY2fV0sInNlc3Npb25faWQiOiJhNjQ4NTUyMC1lMWYzLTQ1NzEtODE2OS1lNmQ4YmY3NTc0ZDYiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.DdlDC8HDRnhI9i79zWot0fyVClLaEtpNJRfJ2d797wxYvJykdHZjswNJ0ggNxTGFaBERxysyAfgjUPPEyOidfw\",\"refresh_token\":\"py25hy3svglo\",\"expires_in\":3600,\"expires_at\":1775370066,\"token_type\":\"bearer\",\"user\":{\"id\":\"5493a995-0280-4a8c-be07-1060106111b1\",\"aud\":\"authenticated\",\"role\":\"authenticated\",\"email\":\"test@test.com\",\"email_confirmed_at\":\"2026-04-05T05:16:29.225913Z\",\"phone\":\"\",\"confirmed_at\":\"2026-04-05T05:16:29.225913Z\",\"last_sign_in_at\":\"2026-04-05T05:21:06.640557882Z\",\"app_metadata\":{\"provider\":\"email\",\"providers\":[\"email\"]},\"user_metadata\":{\"email_verified\":true},\"identities\":[{\"identity_id\":\"d3e18873-cc4d-41c7-806f-c92f1a415c03\",\"id\":\"5493a995-0280-4a8c-be07-1060106111b1\",\"user_id\":\"5493a995-0280-4a8c-be07-1060106111b1\",\"identity_data\":{\"email\":\"test@test.com\",\"email_verified\":false,\"phone_verified\":false,\"sub\":\"5493a995-0280-4a8c-be07-1060106111b1\"},\"provider\":\"email\",\"last_sign_in_at\":\"2026-04-05T05:16:29.224552Z\",\"created_at\":\"2026-04-05T05:16:29.224597Z\",\"updated_at\":\"2026-04-05T05:16:29.224597Z\",\"email\":\"test@test.com\"}],\"created_at\":\"2026-04-05T05:16:29.223181Z\",\"updated_at\":\"2026-04-05T05:21:06.645747Z\",\"is_anonymous\":false}}"
+        }
+      ]
+    }
+  ]
+}

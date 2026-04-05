@@ -12,10 +12,10 @@ router.get(
   "/group/:groupId",
   validateParams(groupIdParamSchema),
   asyncHandler(async (req, res) => {
-    const { accessToken } = req as AuthRequest;
+    const { userId } = req as AuthRequest;
     const result = await balancesService.getGroupBalances(
       param(req, "groupId"),
-      accessToken,
+      userId,
     );
     res.json(result);
   }),
