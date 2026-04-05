@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { AppError } from "./lib/errors.js";
@@ -6,6 +7,7 @@ import groupsRouter from "./routes/groups.js";
 import expensesRouter from "./routes/expenses.js";
 import balancesRouter from "./routes/balances.js";
 import settlementsRouter from "./routes/settlements.js";
+import dashboardRouter from "./routes/dashboard.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,6 +26,7 @@ app.use("/groups", groupsRouter);
 app.use("/expenses", expensesRouter);
 app.use("/balances", balancesRouter);
 app.use("/settlements", settlementsRouter);
+app.use("/dashboard", dashboardRouter);
 
 // Global error handler — must be last middleware
 app.use(
