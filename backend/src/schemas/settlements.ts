@@ -6,6 +6,7 @@ export const createSettlementSchema = z.object({
     .number()
     .int("Amount must be an integer (paise)")
     .positive("Amount must be positive"),
+  group_id: z.string().uuid("Invalid group ID").optional(),
 });
 
 export const txnRefSchema = z.object({

@@ -1,36 +1,39 @@
-import { createUserClient, adminClient } from "../lib/supabase.js";
-import { AppError } from "../lib/errors.js";
+import { prisma } from "../lib/prisma.js";
+import { AppError, withPrismaErrors } from "../lib/errors.js";
 import { buildAppSpecificUpiLinks } from "@chalk/shared";
 import { fetchPendingSettlement } from "./helpers.js";
+import { invalidateDashboardCache } from "./dashboard.js";
 
 export async function createSettlement(
   userId: string,
   toUser: string,
   amount: number,
+  groupId?: string,
 ) {
-  if (userId === toUser)
+  if (userId === toUser) {
     throw new AppError(400, "Cannot settle with yourself", "SELF_SETTLEMENT");
+  }
 
-  const { data: payee } = await adminClient
-    .from("users")
-    .select("id, name, upi_id")
-    .eq("id", toUser)
-    .single();
+  const payee = await prisma.users.findUnique({
+    where: { id: toUser },
+    select: { id: true, name: true, upi_id: true },
+  });
 
-  if (!payee) throw new AppError(404, "Payee not found", "PAYEE_NOT_FOUND");
+  if (!payee) {
+    throw new AppError(404, "Payee not found", "PAYEE_NOT_FOUND");
+  }
 
-  const { data: settlement, error } = await adminClient
-    .from("settlements")
-    .insert({
-      from_user: userId,
-      to_user: toUser,
-      amount,
-      status: "pending",
-    })
-    .select()
-    .single();
-
-  if (error) throw new AppError(400, error.message, "SETTLEMENT_CREATE_FAILED");
+  const settlement = await withPrismaErrors(() =>
+    prisma.settlements.create({
+      data: {
+        from_user: userId,
+        to_user: toUser,
+        amount,
+        status: "pending",
+        ...(groupId && { group_id: groupId }),
+      },
+    }),
+  );
 
   let upiLinks = null;
   if (payee.upi_id) {
@@ -46,35 +49,36 @@ export async function createSettlement(
     }
   }
 
+  invalidateDashboardCache(userId);
   return { settlement, upi_links: upiLinks };
 }
 
 export async function confirmSettlement(settlementId: string, userId: string) {
   await fetchPendingSettlement(settlementId, userId, "payee");
 
-  const { data, error } = await adminClient
-    .from("settlements")
-    .update({ status: "confirmed", paid_at: new Date().toISOString() })
-    .eq("id", settlementId)
-    .select()
-    .single();
+  const settlement = await withPrismaErrors(() =>
+    prisma.settlements.update({
+      where: { id: settlementId },
+      data: { status: "confirmed", paid_at: new Date() },
+    }),
+  );
 
-  if (error) throw new AppError(400, error.message, "CONFIRM_FAILED");
-  return data;
+  invalidateDashboardCache(userId);
+  return settlement;
 }
 
 export async function rejectSettlement(settlementId: string, userId: string) {
   await fetchPendingSettlement(settlementId, userId, "payee");
 
-  const { data, error } = await adminClient
-    .from("settlements")
-    .update({ status: "rejected" })
-    .eq("id", settlementId)
-    .select()
-    .single();
+  const settlement = await withPrismaErrors(() =>
+    prisma.settlements.update({
+      where: { id: settlementId },
+      data: { status: "rejected" },
+    }),
+  );
 
-  if (error) throw new AppError(400, error.message, "REJECT_FAILED");
-  return data;
+  invalidateDashboardCache(userId);
+  return settlement;
 }
 
 export async function addTxnRef(
@@ -84,26 +88,30 @@ export async function addTxnRef(
 ) {
   await fetchPendingSettlement(settlementId, userId, "payer");
 
-  const { data, error } = await adminClient
-    .from("settlements")
-    .update({ upi_txn_id: upiTxnId })
-    .eq("id", settlementId)
-    .select()
-    .single();
-
-  if (error) throw new AppError(400, error.message, "TXN_REF_FAILED");
-  return data;
+  return withPrismaErrors(() =>
+    prisma.settlements.update({
+      where: { id: settlementId },
+      data: { upi_txn_id: upiTxnId },
+    }),
+  );
 }
 
-export async function listSettlements(accessToken: string) {
-  const supabase = createUserClient(accessToken);
-
-  const { data, error } = await supabase
-    .from("settlements")
-    .select("*")
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new AppError(400, error.message, "SETTLEMENTS_FETCH_FAILED");
-  return data ?? [];
+export async function listSettlements(userId: string) {
+  return prisma.settlements.findMany({
+    where: {
+      deleted_at: null,
+      OR: [{ from_user: userId }, { to_user: userId }],
+    },
+    orderBy: { created_at: "desc" },
+    select: {
+      id: true,
+      from_user: true,
+      to_user: true,
+      amount: true,
+      status: true,
+      upi_txn_id: true,
+      paid_at: true,
+      created_at: true,
+    },
+  });
 }

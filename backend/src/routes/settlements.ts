@@ -17,11 +17,12 @@ router.post(
   validate(createSettlementSchema),
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthRequest;
-    const { to_user, amount } = req.body;
+    const { to_user, amount, group_id } = req.body;
     const result = await settlementsService.createSettlement(
       userId,
       to_user,
       amount,
+      group_id,
     );
     res.status(201).json(result);
   }),
@@ -30,8 +31,8 @@ router.post(
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    const { accessToken } = req as AuthRequest;
-    const settlements = await settlementsService.listSettlements(accessToken);
+    const { userId } = req as AuthRequest;
+    const settlements = await settlementsService.listSettlements(userId);
     res.json({ settlements });
   }),
 );

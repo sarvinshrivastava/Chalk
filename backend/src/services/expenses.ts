@@ -1,6 +1,8 @@
-import { createUserClient, adminClient } from "../lib/supabase.js";
-import { AppError } from "../lib/errors.js";
+import { prisma } from "../lib/prisma.js";
+import { AppError, withPrismaErrors } from "../lib/errors.js";
+import type { SplitType } from "@chalk/shared";
 import { requireGroupMembership } from "./helpers.js";
+import { invalidateDashboardCache } from "./dashboard.js";
 
 interface SplitEntry {
   user_id: string;
@@ -11,28 +13,26 @@ interface CreateExpenseInput {
   group_id: string;
   total_amount: number;
   description: string;
-  split_type: "equal" | "custom_percent" | "custom_amount";
+  split_type: Exclude<SplitType, "by_item">;
   split_with?: string[];
   percentages?: Record<string, number>;
   amounts?: Record<string, number>;
 }
 
-export async function createExpense(
-  userId: string,
-  accessToken: string,
-  input: CreateExpenseInput,
-) {
-  const supabase = createUserClient(accessToken);
-  await requireGroupMembership(supabase, input.group_id);
-
+export async function createExpense(userId: string, input: CreateExpenseInput) {
   const participantIds = getParticipantIds(input);
-  const { data: members } = await adminClient
-    .from("group_members")
-    .select("user_id")
-    .eq("group_id", input.group_id)
-    .in("user_id", participantIds);
 
-  const memberIds = new Set((members ?? []).map((m) => m.user_id));
+  // Single query: verify creator membership + validate all participants
+  const members = await prisma.group_members.findMany({
+    where: { group_id: input.group_id },
+    select: { user_id: true },
+  });
+
+  const memberIds = new Set(members.map((m) => m.user_id));
+  if (!memberIds.has(userId)) {
+    throw new AppError(403, "You are not a member of this group", "NOT_MEMBER");
+  }
+
   const nonMembers = participantIds.filter((id) => !memberIds.has(id));
   if (nonMembers.length > 0) {
     throw new AppError(
@@ -44,97 +44,97 @@ export async function createExpense(
 
   const splits = calculateSplits(input);
 
-  const { data: expense, error: expenseErr } = await adminClient
-    .from("expenses")
-    .insert({
-      group_id: input.group_id,
-      paid_by: userId,
-      total_amount: input.total_amount,
-      description: input.description,
-      split_type: input.split_type,
-    })
-    .select()
-    .single();
+  const result = await withPrismaErrors(() =>
+    prisma.$transaction(async (tx) => {
+      const expense = await tx.expenses.create({
+        data: {
+          group_id: input.group_id,
+          paid_by: userId,
+          total_amount: input.total_amount,
+          description: input.description,
+          split_type: input.split_type,
+        },
+      });
 
-  if (expenseErr)
-    throw new AppError(400, expenseErr.message, "EXPENSE_CREATE_FAILED");
+      const splitRows = splits.map((s) => ({
+        expense_id: expense.id,
+        user_id: s.user_id,
+        amount_owed: s.amount_owed,
+      }));
 
-  const splitRows = splits.map((s) => ({
-    expense_id: expense!.id,
-    user_id: s.user_id,
-    amount_owed: s.amount_owed,
-  }));
+      await tx.expense_splits.createMany({ data: splitRows });
 
-  const { error: splitErr } = await adminClient
-    .from("expense_splits")
-    .insert(splitRows);
-  if (splitErr)
-    throw new AppError(400, splitErr.message, "SPLITS_CREATE_FAILED");
+      return { expense, splits: splitRows };
+    }),
+  );
 
-  return { expense, splits: splitRows };
+  invalidateDashboardCache(userId);
+  return result;
 }
 
-export async function listGroupExpenses(groupId: string, accessToken: string) {
-  const supabase = createUserClient(accessToken);
+export async function listGroupExpenses(groupId: string, userId: string) {
+  await requireGroupMembership(groupId, userId);
 
-  const { data, error } = await supabase
-    .from("expenses")
-    .select(
-      "*, expense_splits(id, user_id, amount_owed), users!expenses_paid_by_fkey(name)",
-    )
-    .eq("group_id", groupId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new AppError(400, error.message, "EXPENSES_FETCH_FAILED");
-  return data ?? [];
+  return prisma.expenses.findMany({
+    where: { group_id: groupId, deleted_at: null },
+    orderBy: { created_at: "desc" },
+    include: {
+      expense_splits: {
+        select: { id: true, user_id: true, amount_owed: true },
+      },
+      users: { select: { name: true } },
+    },
+  });
 }
 
-export async function getExpense(expenseId: string, accessToken: string) {
-  const supabase = createUserClient(accessToken);
+export async function getExpense(expenseId: string, userId: string) {
+  const expense = await prisma.expenses.findFirst({
+    where: { id: expenseId, deleted_at: null },
+    include: {
+      expense_splits: {
+        select: { id: true, user_id: true, amount_owed: true },
+      },
+    },
+  });
 
-  const { data, error } = await supabase
-    .from("expenses")
-    .select("*, expense_splits(id, user_id, amount_owed)")
-    .eq("id", expenseId)
-    .is("deleted_at", null)
-    .single();
-
-  if (error || !data)
+  if (!expense) {
     throw new AppError(404, "Expense not found", "EXPENSE_NOT_FOUND");
-  return data;
+  }
+
+  await requireGroupMembership(expense.group_id, userId);
+
+  return expense;
 }
 
-export async function deleteExpense(
-  expenseId: string,
-  userId: string,
-  accessToken: string,
-) {
-  const supabase = createUserClient(accessToken);
+export async function deleteExpense(expenseId: string, userId: string) {
+  const expense = await prisma.expenses.findFirst({
+    where: { id: expenseId, deleted_at: null },
+    select: { paid_by: true, group_id: true },
+  });
 
-  const { data: expense } = await supabase
-    .from("expenses")
-    .select("paid_by")
-    .eq("id", expenseId)
-    .is("deleted_at", null)
-    .single();
-
-  if (!expense)
+  if (!expense) {
     throw new AppError(404, "Expense not found", "EXPENSE_NOT_FOUND");
-  if (expense.paid_by !== userId)
+  }
+
+  await requireGroupMembership(expense.group_id, userId);
+
+  if (expense.paid_by !== userId) {
     throw new AppError(
       403,
       "Only the payer can delete this expense",
       "NOT_PAYER",
     );
+  }
 
-  const { error } = await adminClient
-    .from("expenses")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", expenseId);
+  await prisma.expenses.update({
+    where: { id: expenseId },
+    data: { deleted_at: new Date() },
+  });
 
-  if (error) throw new AppError(400, error.message, "DELETE_FAILED");
+  invalidateDashboardCache(userId);
 }
+
+// ── Split calculation helpers (unchanged logic) ──────────────────────
 
 function getParticipantIds(input: CreateExpenseInput): string[] {
   switch (input.split_type) {

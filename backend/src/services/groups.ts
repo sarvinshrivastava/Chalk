@@ -1,108 +1,105 @@
-import { createUserClient, adminClient } from "../lib/supabase.js";
-import { AppError } from "../lib/errors.js";
+import { prisma } from "../lib/prisma.js";
+import { AppError, withPrismaErrors } from "../lib/errors.js";
 import { GROUP_MAX_MEMBERS } from "@chalk/shared";
 import { requireGroupMembership } from "./helpers.js";
+import { invalidateDashboardCache } from "./dashboard.js";
 
-export async function createGroup(
-  _userId: string,
-  accessToken: string,
-  name: string,
-) {
-  const supabase = createUserClient(accessToken);
+export async function createGroup(userId: string, name: string) {
+  const group = await withPrismaErrors(() =>
+    prisma.$transaction(async (tx) => {
+      const newGroup = await tx.groups.create({
+        data: { name, created_by: userId },
+      });
 
-  const { data: groupId, error } = await supabase.rpc(
-    "create_group_with_member",
-    {
-      group_name: name,
-    },
+      await tx.group_members.create({
+        data: { group_id: newGroup.id, user_id: userId },
+      });
+
+      return newGroup;
+    }),
   );
 
-  if (error) throw new AppError(400, error.message, "GROUP_CREATE_FAILED");
-
-  const { data: group } = await supabase
-    .from("groups")
-    .select("*")
-    .eq("id", groupId)
-    .single();
+  invalidateDashboardCache(userId);
   return group;
 }
 
-export async function listGroups(accessToken: string) {
-  const supabase = createUserClient(accessToken);
+export async function listGroups(userId: string) {
+  const memberships = await prisma.group_members.findMany({
+    where: { user_id: userId },
+    orderBy: { joined_at: "desc" },
+    include: {
+      groups: {
+        select: {
+          id: true,
+          name: true,
+          created_by: true,
+          created_at: true,
+        },
+      },
+    },
+  });
 
-  const { data, error } = await supabase
-    .from("group_members")
-    .select("group_id, joined_at, groups(id, name, created_by, created_at)")
-    .order("joined_at", { ascending: false });
-
-  if (error) throw new AppError(400, error.message, "GROUPS_FETCH_FAILED");
-
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    ...(row.groups as Record<string, unknown>),
+  return memberships.map((row) => ({
+    ...row.groups,
     joined_at: row.joined_at,
   }));
 }
 
-export async function getGroupDetail(groupId: string, accessToken: string) {
-  const supabase = createUserClient(accessToken);
+export async function getGroupDetail(groupId: string, userId: string) {
+  const group = await prisma.groups.findUnique({ where: { id: groupId } });
+  if (!group) throw new AppError(404, "Group not found", "GROUP_NOT_FOUND");
 
-  const [groupResult, membersResult] = await Promise.all([
-    supabase.from("groups").select("*").eq("id", groupId).single(),
-    supabase
-      .from("group_members")
-      .select("user_id, joined_at, users(id, name, upi_id)")
-      .eq("group_id", groupId),
-  ]);
+  const memberships = await prisma.group_members.findMany({
+    where: { group_id: groupId },
+    select: {
+      joined_at: true,
+      users: { select: { id: true, name: true, upi_id: true } },
+    },
+  });
 
-  if (groupResult.error)
-    throw new AppError(404, "Group not found", "GROUP_NOT_FOUND");
+  if (!memberships.some((m) => m.users.id === userId)) {
+    throw new AppError(403, "You are not a member of this group", "NOT_MEMBER");
+  }
 
-  const members = (membersResult.data ?? []).map(
-    (m: Record<string, unknown>) => ({
-      ...(m.users as Record<string, unknown>),
-      joined_at: m.joined_at,
-    }),
-  );
+  const members = memberships.map((m) => ({
+    ...m.users,
+    joined_at: m.joined_at,
+  }));
 
-  return { group: groupResult.data, members };
+  return { group, members };
 }
 
 export async function inviteMember(
   groupId: string,
   phone: string,
-  accessToken: string,
+  userId: string,
 ) {
-  const { data: targetUser } = await adminClient
-    .from("users")
-    .select("id")
-    .eq("phone", phone)
-    .is("deleted_at", null)
-    .single();
+  await requireGroupMembership(groupId, userId);
 
-  if (!targetUser)
+  const targetUser = await prisma.users.findFirst({
+    where: { phone, deleted_at: null },
+    select: { id: true },
+  });
+
+  if (!targetUser) {
     throw new AppError(
       404,
       "No user found with that phone number",
       "USER_NOT_FOUND",
     );
+  }
 
-  const supabase = createUserClient(accessToken);
-
-  const [, countResult, existingResult] = await Promise.all([
-    requireGroupMembership(supabase, groupId),
-    adminClient
-      .from("group_members")
-      .select("*", { count: "exact", head: true })
-      .eq("group_id", groupId),
-    adminClient
-      .from("group_members")
-      .select("user_id")
-      .eq("group_id", groupId)
-      .eq("user_id", targetUser.id)
-      .maybeSingle(),
+  const [memberCount, existingMember] = await Promise.all([
+    prisma.group_members.count({ where: { group_id: groupId } }),
+    prisma.group_members.findUnique({
+      where: {
+        group_id_user_id: { group_id: groupId, user_id: targetUser.id },
+      },
+      select: { user_id: true },
+    }),
   ]);
 
-  if (countResult.count !== null && countResult.count >= GROUP_MAX_MEMBERS) {
+  if (memberCount >= GROUP_MAX_MEMBERS) {
     throw new AppError(
       400,
       `Group cannot exceed ${GROUP_MAX_MEMBERS} members`,
@@ -110,33 +107,55 @@ export async function inviteMember(
     );
   }
 
-  if (existingResult.data)
+  if (existingMember) {
     throw new AppError(409, "User is already a member", "ALREADY_MEMBER");
+  }
 
-  const { error } = await adminClient
-    .from("group_members")
-    .insert({ group_id: groupId, user_id: targetUser.id });
-
-  if (error) throw new AppError(400, error.message, "INVITE_FAILED");
+  await withPrismaErrors(() =>
+    prisma.group_members.create({
+      data: { group_id: groupId, user_id: targetUser.id },
+    }),
+  );
 
   return { user_id: targetUser.id };
 }
 
 export async function leaveGroup(groupId: string, userId: string) {
-  const { error } = await adminClient
-    .from("group_members")
-    .delete()
-    .eq("group_id", groupId)
-    .eq("user_id", userId);
+  await withPrismaErrors(() =>
+    prisma.group_members.delete({
+      where: { group_id_user_id: { group_id: groupId, user_id: userId } },
+    }),
+  );
 
-  if (error) throw new AppError(400, error.message, "LEAVE_FAILED");
+  invalidateDashboardCache(userId);
 }
 
-export async function deleteGroup(groupId: string, accessToken: string) {
-  const supabase = createUserClient(accessToken);
-
-  const { error } = await supabase.rpc("delete_group", {
-    target_group_id: groupId,
+export async function deleteGroup(groupId: string, userId: string) {
+  const group = await prisma.groups.findUnique({
+    where: { id: groupId },
+    select: { created_by: true },
   });
-  if (error) throw new AppError(403, error.message, "DELETE_GROUP_FAILED");
+
+  if (!group) {
+    throw new AppError(404, "Group not found", "GROUP_NOT_FOUND");
+  }
+
+  if (group.created_by !== userId) {
+    throw new AppError(
+      403,
+      "Only the group creator can delete the group",
+      "DELETE_GROUP_FAILED",
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.expense_splits.deleteMany({
+      where: { expenses: { group_id: groupId } },
+    });
+    await tx.expenses.deleteMany({ where: { group_id: groupId } });
+    await tx.group_members.deleteMany({ where: { group_id: groupId } });
+    await tx.groups.delete({ where: { id: groupId } });
+  });
+
+  invalidateDashboardCache(userId);
 }
