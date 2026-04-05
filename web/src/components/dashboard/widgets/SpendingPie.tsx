@@ -17,7 +17,7 @@ export function SpendingPie({ data, config }: WidgetProps) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" minHeight={140} aspect={1}>
       <PieChart>
         <Pie
           data={chartData}
