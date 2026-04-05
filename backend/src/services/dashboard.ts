@@ -265,24 +265,21 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
             AND (from_user = ${userId}::uuid OR to_user = ${userId}::uuid)
           GROUP BY from_user, to_user
         )
-      SELECT
-        u.id AS other_user,
-        u.name AS other_name,
-        (
-          COALESCE((SELECT SUM(p.amt) FROM paid p WHERE p.payer = ${userId}::uuid AND p.debtor = u.id), 0)
-          - COALESCE((SELECT SUM(p.amt) FROM paid p WHERE p.payer = u.id AND p.debtor = ${userId}::uuid), 0)
-          - COALESCE((SELECT SUM(s.amt) FROM settled s WHERE s.from_user = u.id AND s.to_user = ${userId}::uuid), 0)
-          + COALESCE((SELECT SUM(s.amt) FROM settled s WHERE s.from_user = ${userId}::uuid AND s.to_user = u.id), 0)
-        ) AS net
-      FROM users u
-      WHERE u.id != ${userId}::uuid
-        AND u.deleted_at IS NULL
-      HAVING (
-          COALESCE((SELECT SUM(p.amt) FROM paid p WHERE p.payer = ${userId}::uuid AND p.debtor = u.id), 0)
-          - COALESCE((SELECT SUM(p.amt) FROM paid p WHERE p.payer = u.id AND p.debtor = ${userId}::uuid), 0)
-          - COALESCE((SELECT SUM(s.amt) FROM settled s WHERE s.from_user = u.id AND s.to_user = ${userId}::uuid), 0)
-          + COALESCE((SELECT SUM(s.amt) FROM settled s WHERE s.from_user = ${userId}::uuid AND s.to_user = u.id), 0)
-        ) != 0
+      SELECT other_user, other_name, net FROM (
+        SELECT
+          u.id AS other_user,
+          u.name AS other_name,
+          (
+            COALESCE((SELECT SUM(p.amt) FROM paid p WHERE p.payer = ${userId}::uuid AND p.debtor = u.id), 0)
+            - COALESCE((SELECT SUM(p.amt) FROM paid p WHERE p.payer = u.id AND p.debtor = ${userId}::uuid), 0)
+            - COALESCE((SELECT SUM(s.amt) FROM settled s WHERE s.from_user = u.id AND s.to_user = ${userId}::uuid), 0)
+            + COALESCE((SELECT SUM(s.amt) FROM settled s WHERE s.from_user = ${userId}::uuid AND s.to_user = u.id), 0)
+          ) AS net
+        FROM users u
+        WHERE u.id != ${userId}::uuid
+          AND u.deleted_at IS NULL
+      ) balances
+      WHERE net != 0
     `,
   ]);
 
