@@ -35,8 +35,8 @@ interface BentoGridProps {
 function useColumns(): number {
   const getColumns = useCallback(() => {
     const w = window.innerWidth;
-    if (w >= 1024) return 3;
-    if (w >= 768) return 2;
+    if (w >= 1280) return 3; // 1280 - 260px sidebar = 1020px content → 3 cols comfortable
+    if (w >= 768) return 2; // 768-1279 → 2 cols (works with or without sidebar)
     return 1;
   }, []);
 

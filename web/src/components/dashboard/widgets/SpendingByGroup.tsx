@@ -22,7 +22,7 @@ export function SpendingByGroup({ data, config }: WidgetProps) {
   }
 
   return (
-    <ResponsiveContainer width="100%" minHeight={140} aspect={2}>
+    <ResponsiveContainer width="99%" height={280}>
       <BarChart
         data={chartData}
         layout={isHorizontal ? "vertical" : "horizontal"}

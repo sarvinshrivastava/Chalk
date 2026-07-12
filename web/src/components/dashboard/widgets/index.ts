@@ -13,7 +13,7 @@ import { MonthlyTrend } from "./MonthlyTrend";
 export type { WidgetDefinition, WidgetProps, WidgetConfigField } from "./types";
 
 interface RegistryEntry {
-  component: React.MemoExoticType<React.ComponentType<WidgetProps>>;
+  component: React.ComponentType<WidgetProps>;
   definition: WidgetDefinition;
 }
 
@@ -33,7 +33,7 @@ export const WIDGET_REGISTRY: Record<string, RegistryEntry> = {
     },
   },
   "spending-by-group": {
-    component: React.memo(SpendingByGroup),
+    component: SpendingByGroup,
     definition: {
       type: "spending-by-group",
       name: "Spending by Group",
@@ -59,7 +59,7 @@ export const WIDGET_REGISTRY: Record<string, RegistryEntry> = {
     },
   },
   "spending-pie": {
-    component: React.memo(SpendingPie),
+    component: SpendingPie,
     definition: {
       type: "spending-pie",
       name: "Spending Pie",
@@ -160,7 +160,7 @@ export const WIDGET_REGISTRY: Record<string, RegistryEntry> = {
     },
   },
   "monthly-trend": {
-    component: React.memo(MonthlyTrend),
+    component: MonthlyTrend,
     definition: {
       type: "monthly-trend",
       name: "Monthly Trend",

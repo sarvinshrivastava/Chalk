@@ -29,7 +29,7 @@ export function MonthlyTrend({ data, config }: WidgetProps) {
   };
 
   return (
-    <ResponsiveContainer width="100%" minHeight={140} aspect={2.5}>
+    <ResponsiveContainer width="99%" height={140}>
       {chartType === "area" ? (
         <AreaChart {...sharedProps}>
           <XAxis dataKey="month" />
