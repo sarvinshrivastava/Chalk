@@ -1,0 +1,168 @@
+<h2>Dashboard layout pattern</h2>
+<p class="subtitle">How should widgets be arranged? Click the layout that feels right for Chalk.</p>
+
+<div class="cards">
+  <div class="card" data-choice="grid" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#FAF8F3;border-radius:8px;">
+        <!-- Bento grid mockup -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto auto auto;gap:8px;">
+          <!-- Row 1: summary bar spans full -->
+          <div style="grid-column:1/-1;background:#0A6E5A;color:white;padding:12px 16px;border-radius:6px;font-size:13px;display:flex;justify-content:space-between;">
+            <span><strong>Total owed to you:</strong> ₹2,450</span>
+            <span><strong>You owe:</strong> ₹780</span>
+            <span><strong>Net:</strong> +₹1,670</span>
+          </div>
+          <!-- Row 2 -->
+          <div style="grid-column:1/3;background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:8px;">Spending by Group</div>
+            <!-- Fake bar chart -->
+            <div style="display:flex;align-items:end;gap:6px;height:60px;">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                <div style="width:100%;background:#0A6E5A;border-radius:3px 3px 0 0;height:50px;"></div>
+                <span style="font-size:8px;color:#25201880;">Trip</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                <div style="width:100%;background:#0A6E5A80;border-radius:3px 3px 0 0;height:30px;"></div>
+                <span style="font-size:8px;color:#25201880;">Flat</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                <div style="width:100%;background:#0A6E5A40;border-radius:3px 3px 0 0;height:18px;"></div>
+                <span style="font-size:8px;color:#25201880;">Office</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                <div style="width:100%;background:#0A6E5A20;border-radius:3px 3px 0 0;height:10px;"></div>
+                <span style="font-size:8px;color:#25201880;">Other</span>
+              </div>
+            </div>
+          </div>
+          <div style="background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:6px;">Top Debtor</div>
+            <div style="font-size:18px;font-weight:700;color:#C0392B;">₹1,200</div>
+            <div style="font-size:11px;color:#25201880;">Rahul owes you</div>
+          </div>
+          <!-- Row 3 -->
+          <div style="background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:6px;">Pending Settles</div>
+            <div style="font-size:18px;font-weight:700;color:#B87514;">3</div>
+            <div style="font-size:11px;color:#25201880;">across 2 groups</div>
+          </div>
+          <div style="grid-column:2/4;background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:8px;">Recent Expenses</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;justify-content:space-between;font-size:11px;"><span>Dinner at Meghana</span><span style="font-weight:600;">₹1,200</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#25201880;"><span>Uber to airport</span><span style="font-weight:600;">₹450</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#25201880;"><span>Groceries</span><span style="font-weight:600;">₹380</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Bento Grid</h3>
+      <p>Widgets snap to a grid. Users drag to reposition and resize (1×1, 2×1, etc). Dense, information-rich. On mobile: collapses to single-column stack.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="masonry" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#FAF8F3;border-radius:8px;">
+        <!-- Masonry/Pinterest mockup -->
+        <div style="columns:2;column-gap:8px;">
+          <!-- Col 1 items -->
+          <div style="break-inside:avoid;margin-bottom:8px;background:#0A6E5A;color:white;padding:14px;border-radius:6px;">
+            <div style="font-size:10px;text-transform:uppercase;opacity:0.8;margin-bottom:4px;">Net Balance</div>
+            <div style="font-size:22px;font-weight:700;">+₹1,670</div>
+            <div style="font-size:11px;opacity:0.7;margin-top:2px;">across 4 groups</div>
+          </div>
+          <div style="break-inside:avoid;margin-bottom:8px;background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:8px;">Spending Pie</div>
+            <!-- Fake pie chart -->
+            <div style="width:80px;height:80px;border-radius:50%;background:conic-gradient(#0A6E5A 0% 45%, #B87514 45% 70%, #1A5FA5 70% 88%, #E5E2DB 88% 100%);margin:0 auto;"></div>
+            <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;">
+              <span style="font-size:9px;color:#0A6E5A;">■ Trip</span>
+              <span style="font-size:9px;color:#B87514;">■ Flat</span>
+              <span style="font-size:9px;color:#1A5FA5;">■ Work</span>
+            </div>
+          </div>
+          <div style="break-inside:avoid;margin-bottom:8px;background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:6px;">Groups</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;"><span style="font-weight:500;">Goa Trip</span><span style="color:#0A6E5A;font-weight:600;">+₹800</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;"><span style="font-weight:500;">Flat Expenses</span><span style="color:#C0392B;font-weight:600;">-₹200</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;"><span style="font-weight:500;">Office Lunch</span><span style="color:#0A6E5A;font-weight:600;">+₹450</span></div>
+            </div>
+          </div>
+          <!-- Col 2 items -->
+          <div style="break-inside:avoid;margin-bottom:8px;background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:8px;">Recent Activity</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="font-size:11px;"><strong>Dinner</strong> — ₹1,200 <span style="color:#25201880;">· Trip</span></div>
+              <div style="font-size:11px;"><strong>Uber</strong> — ₹450 <span style="color:#25201880;">· Trip</span></div>
+              <div style="font-size:11px;"><strong>Groceries</strong> — ₹380 <span style="color:#25201880;">· Flat</span></div>
+              <div style="font-size:11px;"><strong>WiFi bill</strong> — ₹600 <span style="color:#25201880;">· Flat</span></div>
+            </div>
+          </div>
+          <div style="break-inside:avoid;margin-bottom:8px;background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:6px;">You Owe Most In</div>
+            <div style="font-size:16px;font-weight:700;color:#C0392B;">Flat Expenses</div>
+            <div style="font-size:11px;color:#25201880;">₹780 total</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Masonry / Card Flow</h3>
+      <p>Cards of varying heights flow naturally. Feels modern (Pinterest-style). Users add/remove cards and reorder. On mobile: single column, natural scroll.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="sections" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#FAF8F3;border-radius:8px;">
+        <!-- Sectioned layout mockup -->
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <!-- Hero stats row -->
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;background:#0A6E5A;color:white;padding:12px;border-radius:6px;text-align:center;">
+              <div style="font-size:9px;text-transform:uppercase;opacity:0.8;">Owed to you</div>
+              <div style="font-size:20px;font-weight:700;">₹2,450</div>
+            </div>
+            <div style="flex:1;background:white;border:1px solid #E5E2DB;padding:12px;border-radius:6px;text-align:center;">
+              <div style="font-size:9px;text-transform:uppercase;color:#25201880;">You owe</div>
+              <div style="font-size:20px;font-weight:700;color:#C0392B;">₹780</div>
+            </div>
+            <div style="flex:1;background:white;border:1px solid #E5E2DB;padding:12px;border-radius:6px;text-align:center;">
+              <div style="font-size:9px;text-transform:uppercase;color:#25201880;">Net</div>
+              <div style="font-size:20px;font-weight:700;color:#0A6E5A;">+₹1,670</div>
+            </div>
+          </div>
+          <!-- Section: Charts -->
+          <div style="background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:8px;">Analytics</div>
+            <div style="display:flex;gap:12px;align-items:center;">
+              <div style="width:60px;height:60px;border-radius:50%;background:conic-gradient(#0A6E5A 0% 45%, #B87514 45% 70%, #1A5FA5 70% 88%, #E5E2DB 88% 100%);flex-shrink:0;"></div>
+              <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
+                <div style="display:flex;align-items:center;gap:4px;font-size:10px;"><span style="width:8px;height:8px;background:#0A6E5A;border-radius:2px;display:inline-block;"></span> Trip — 45%</div>
+                <div style="display:flex;align-items:center;gap:4px;font-size:10px;"><span style="width:8px;height:8px;background:#B87514;border-radius:2px;display:inline-block;"></span> Flat — 25%</div>
+                <div style="display:flex;align-items:center;gap:4px;font-size:10px;"><span style="width:8px;height:8px;background:#1A5FA5;border-radius:2px;display:inline-block;"></span> Work — 18%</div>
+              </div>
+            </div>
+          </div>
+          <!-- Section: Activity -->
+          <div style="background:white;border:1px solid #E5E2DB;border-radius:6px;padding:12px;">
+            <div style="font-size:10px;text-transform:uppercase;color:#25201880;font-weight:600;margin-bottom:6px;">Recent Expenses</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;justify-content:space-between;font-size:11px;"><span>Dinner at Meghana</span><span style="font-weight:600;">₹1,200</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;"><span>Uber to airport</span><span style="font-weight:600;">₹450</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Stacked Sections</h3>
+      <p>Full-width sections in a vertical scroll. Hero stats on top, then collapsible sections users can reorder. Simplest to build, works great on mobile natively.</p>
+    </div>
+  </div>
+</div>

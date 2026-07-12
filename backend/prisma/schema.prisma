@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model expense_splits {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expense_id  String   @db.Uuid
+  user_id     String   @db.Uuid
+  amount_owed BigInt
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  expenses    expenses @relation(fields: [expense_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users       users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([expense_id], map: "idx_expense_splits_expense")
+  @@index([user_id], map: "idx_expense_splits_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model expenses {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id       String           @db.Uuid
+  paid_by        String           @db.Uuid
+  total_amount   BigInt
+  description    String           @default("")
+  bill_image_url String?
+  split_type     String
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  deleted_at     DateTime?        @db.Timestamptz(6)
+  expense_splits expense_splits[]
+  groups         groups           @relation(fields: [group_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users          users            @relation(fields: [paid_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([group_id], map: "idx_expenses_group")
+  @@index([paid_by], map: "idx_expenses_paid_by")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model group_members {
+  group_id  String   @db.Uuid
+  user_id   String   @db.Uuid
+  joined_at DateTime @default(now()) @db.Timestamptz(6)
+  groups    groups   @relation(fields: [group_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users     users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([group_id, user_id])
+  @@index([user_id], map: "idx_group_members_user")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model groups {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  created_by    String          @db.Uuid
+  created_at    DateTime        @default(now()) @db.Timestamptz(6)
+  deleted_at    DateTime?       @db.Timestamptz(6)
+  expenses      expenses[]
+  group_members group_members[]
+  settlements   settlements[]
+  users         users           @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model personal_tally {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  category   String
+  amount     BigInt   @default(0)
+  month      String
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([user_id, category, month])
+  @@index([user_id, month], map: "idx_personal_tally_user_month")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model settlements {
+  id                                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  from_user                          String    @db.Uuid
+  to_user                            String    @db.Uuid
+  amount                             BigInt
+  upi_txn_id                         String?
+  status                             String    @default("pending")
+  paid_at                            DateTime? @db.Timestamptz(6)
+  created_at                         DateTime  @default(now()) @db.Timestamptz(6)
+  deleted_at                         DateTime? @db.Timestamptz(6)
+  group_id                           String?   @db.Uuid
+  groups                             groups?   @relation(fields: [group_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_settlements_from_userTousers users     @relation("settlements_from_userTousers", fields: [from_user], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_settlements_to_userTousers   users     @relation("settlements_to_userTousers", fields: [to_user], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([from_user], map: "idx_settlements_from")
+  @@index([to_user], map: "idx_settlements_to")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id                                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                     String
+  upi_id                                   String?
+  phone                                    String?          @unique
+  auth_provider                            String
+  created_at                               DateTime         @default(now()) @db.Timestamptz(6)
+  deleted_at                               DateTime?        @db.Timestamptz(6)
+  expense_splits                           expense_splits[]
+  expenses                                 expenses[]
+  group_members                            group_members[]
+  groups                                   groups[]
+  personal_tally                           personal_tally[]
+  settlements_settlements_from_userTousers settlements[]    @relation("settlements_from_userTousers")
+  settlements_settlements_to_userTousers   settlements[]    @relation("settlements_to_userTousers")
+  dashboard_layouts                        dashboard_layouts?
+}
+
+/// Dashboard widget layout preferences per user
+model dashboard_layouts {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @unique @db.Uuid
+  layout     Json
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  users users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}

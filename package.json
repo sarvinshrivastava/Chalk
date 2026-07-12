@@ -1,12 +1,23 @@
 {
-  "name": "chalk-app",
+  "name": "chalk",
   "version": "0.0.1",
   "private": true,
-  "description": "Splitwise for India — keep score, stay even.",
-  "workspaces": ["mobile", "web", "backend", "shared"],
+  "description": "Chalk -- keep score, stay even.",
+  "workspaces": [
+    "mobile",
+    "web",
+    "backend",
+    "shared"
+  ],
   "scripts": {
-    "backend": "bun run --filter @chalk/backend dev",
-    "web": "bun run --filter @chalk/web dev",
-    "mobile": "bun run --filter @chalk/mobile start"
+    "backend": "cd backend && bun run dev",
+    "web": "cd web && bun run dev",
+    "mobile": "bun run --filter @chalk/mobile start",
+    "backend-test": "cd backend && bun run test",
+    "backend-test:watch": "cd backend && bun run test:watch",
+    "backend-coverage": "cd backend && bunx vitest run --coverage"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
   }
 }

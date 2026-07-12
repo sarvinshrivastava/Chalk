@@ -1,0 +1,136 @@
+/* Backdrop */
+.widget-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(37, 32, 24, 0.3);
+  z-index: 50;
+  animation: picker-fade-in 0.15s ease;
+}
+
+@keyframes picker-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Slide-out panel */
+.widget-picker {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  max-width: 90vw;
+  background: var(--white);
+  border-left: 1px solid var(--border);
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  animation: picker-slide-in 0.2s ease;
+}
+
+@keyframes picker-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.widget-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.widget-picker-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.widget-picker-close {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 1.1rem;
+}
+
+.widget-picker-close:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.widget-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.widget-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  gap: 12px;
+}
+
+.widget-picker-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.widget-picker-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.widget-picker-desc {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
+.widget-picker-add {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: var(--white);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+
+.widget-picker-add:hover {
+  opacity: 0.9;
+}
+
+.widget-picker-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}

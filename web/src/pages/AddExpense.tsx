@@ -1,39 +1,36 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { getErrorMessage } from "../lib/format";
+import { fetchGroupDetail, createExpense } from "../lib/services";
+import type { GroupMemberDetail } from "../lib/services";
 import "./AddExpense.css";
-
-interface Member {
-  id: string;
-  name: string;
-}
 
 export default function AddExpense() {
   const { groupId } = useParams<{ groupId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<GroupMemberDetail[]>([]);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
+    new Set(),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchMembers = async () => {
-      const { data } = await supabase
-        .from("group_members")
-        .select("user_id, users(id, name)")
-        .eq("group_id", groupId!);
-
-      const list = (data ?? []).map((m: any) => m.users as Member);
-      setMembers(list);
-      // Select all members by default
-      setSelectedMembers(new Set(list.map((m: Member) => m.id)));
+    const loadMembers = async () => {
+      try {
+        const { members } = await fetchGroupDetail(groupId!);
+        setMembers(members);
+        setSelectedMembers(new Set(members.map((m) => m.id)));
+      } catch (err: unknown) {
+        setError(getErrorMessage(err));
+      }
     };
-    fetchMembers();
+    loadMembers();
   }, [groupId]);
 
   const toggleMember = (id: string) => {
@@ -62,49 +59,20 @@ export default function AddExpense() {
 
     setLoading(true);
     const paise = Math.round(rupees * 100);
-    const splitWith = Array.from(selectedMembers);
 
-    // Equal split calculation (handle remainder)
-    const base = Math.floor(paise / splitWith.length);
-    const remainder = paise - base * splitWith.length;
-
-    // Create expense
-    const { data: expense, error: expErr } = await supabase
-      .from("expenses")
-      .insert({
+    try {
+      await createExpense({
         group_id: groupId!,
-        paid_by: user!.id,
         total_amount: paise,
         description,
         split_type: "equal",
-      })
-      .select()
-      .single();
-
-    if (expErr || !expense) {
-      setError(expErr?.message ?? "Failed to create expense");
+        split_with: Array.from(selectedMembers),
+      });
+      navigate(`/group/${groupId}`);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
       setLoading(false);
-      return;
     }
-
-    // Create splits
-    const splits = splitWith.map((userId, i) => ({
-      expense_id: expense.id,
-      user_id: userId,
-      amount_owed: base + (i < remainder ? 1 : 0),
-    }));
-
-    const { error: splitErr } = await supabase
-      .from("expense_splits")
-      .insert(splits);
-
-    if (splitErr) {
-      setError(splitErr.message);
-      setLoading(false);
-      return;
-    }
-
-    navigate(`/group/${groupId}`);
   };
 
   return (
@@ -123,7 +91,7 @@ export default function AddExpense() {
         </div>
 
         <div className="form-group">
-          <label>Amount (₹)</label>
+          <label>Amount ({"\u20B9"})</label>
           <input
             type="number"
             value={amount}
@@ -179,5 +147,5 @@ export default function AddExpense() {
 function formatSplitPreview(rupees: number, count: number): string {
   if (count === 0 || isNaN(rupees)) return "";
   const perPerson = (rupees / count).toFixed(2);
-  return `₹${perPerson} per person`;
+  return `\u20B9${perPerson} per person`;
 }

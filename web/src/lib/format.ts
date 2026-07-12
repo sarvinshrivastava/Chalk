@@ -7,3 +7,9 @@ export function formatPaise(paise: number): string {
   });
   return `${paise < 0 ? "-" : ""}₹${formatted}`;
 }
+
+/** Safely extract a message string from an unknown caught value. */
+export function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
